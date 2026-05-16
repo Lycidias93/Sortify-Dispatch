@@ -1,8 +1,8 @@
 id=sortify
-name=Sortify
-version=4.0
-versionCode=10
-author=xCaptaiN09
-description=Automatically organizes your downloads into categorized folders with improved stability. Now detects and moves duplicate files into a dedicated Duplicates folder, while still skipping hidden and incomplete files for safety.
-updateJson=https://raw.githubusercontent.com/xCaptaiN09/Sortify/main/update.json
+name=Sortify Dispatch
+version=4.0-artifact-guard
+versionCode=11
+author=xCaptaiN09 + Lycidias93
+description=Sortify v4.0 with Artifact Guard for Pixel Drop Dispatcher, Pixel local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
+updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
