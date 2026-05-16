@@ -31,3 +31,13 @@
 - Planned default: `auto`, with safe fallback when dispatcher runtime is missing.
 - Documented that unrelated downloads continue to sort and must not be held.
 <!-- SORTIFY_VNEXT_OPTIONAL_DISPATCHER_INTEGRATION_20260517_END -->
+
+<!-- SORTIFY_OPTIONAL_DISPATCHER_IMPLEMENTED_20260517_START -->
+## 2026-05-17 - Optional dispatcher integration source implementation
+
+- Added config flags for dispatcher integration, protected-artifact hold, and normal sorting.
+- Added `--config-status` action output.
+- Added WebUI controls for normal sorting, hold protected artifacts, and dispatcher integration mode.
+- Kept default dispatcher integration as `auto` to avoid breaking users without Pixel Drop Dispatcher.
+- Replaced WebUI config write heredoc with a quoted `printf` write path.
+<!-- SORTIFY_OPTIONAL_DISPATCHER_IMPLEMENTED_20260517_END -->

@@ -7,7 +7,13 @@ LOG="$MODDIR/sortify.log"
 
 # 1. Load Defaults if config missing
 if [ ! -f "$CONF" ]; then
-    echo "INTERVAL=300" > "$CONF"
+    {
+        echo "INTERVAL=300"
+        echo "GUARD_LOG=1"
+        echo "SORTIFY_DISPATCHER_INTEGRATION=auto"
+        echo "SORTIFY_HOLD_PROTECTED=1"
+        echo "SORTIFY_NORMAL_SORT=1"
+    } > "$CONF"
 fi
 
 # (WebUI is now handled natively by KernelSU via 'webroot' folder. No httpd needed.)
@@ -25,9 +31,21 @@ wait_until_storage
     while true; do
         # Re-read config every cycle to get new INTERVAL
         if [ -f "$CONF" ]; then
-            source "$CONF"
+            . "$CONF"
         fi
-        
+
+        # SORTIFY_SERVICE_CONFIG_SANITIZE_V1_START
+        case "${INTERVAL:-300}" in
+            ''|*[!0-9]*) INTERVAL=300 ;;
+        esac
+        [ "$INTERVAL" -lt 30 ] 2>/dev/null && INTERVAL=30
+        case "${GUARD_LOG:-1}" in 0|1) ;; *) GUARD_LOG=1 ;; esac
+        case "${SORTIFY_DISPATCHER_INTEGRATION:-auto}" in off|auto|on) ;; *) SORTIFY_DISPATCHER_INTEGRATION=auto ;; esac
+        case "${SORTIFY_HOLD_PROTECTED:-1}" in 0|1) ;; *) SORTIFY_HOLD_PROTECTED=1 ;; esac
+        case "${SORTIFY_NORMAL_SORT:-1}" in 0|1) ;; *) SORTIFY_NORMAL_SORT=1 ;; esac
+        export INTERVAL GUARD_LOG SORTIFY_DISPATCHER_INTEGRATION SORTIFY_HOLD_PROTECTED SORTIFY_NORMAL_SORT
+        # SORTIFY_SERVICE_CONFIG_SANITIZE_V1_END
+
         # Run the action script
         # We redirect stdout/stderr to log to capture any 'echo' from action.sh
         sh "$MODDIR/action.sh" >> "$LOG" 2>&1

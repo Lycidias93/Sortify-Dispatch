@@ -99,3 +99,27 @@ vNext design target:
 - `on`: require dispatcher contract and fail clearly if unavailable
 - normal downloads must continue to sort even when dispatcher integration is disabled
 <!-- SORTIFY_OPTIONAL_DISPATCHER_INTEGRATION_20260517_END -->
+
+<!-- SORTIFY_OPTIONAL_DISPATCHER_IMPLEMENTED_20260517_START -->
+## Optional integration controls
+
+Source implementation date: `2026-05-17`.
+
+Config file: `/data/adb/modules/sortify/sortify.conf`
+
+Available flags:
+
+```text
+SORTIFY_DISPATCHER_INTEGRATION=off|auto|on
+SORTIFY_HOLD_PROTECTED=0|1
+SORTIFY_NORMAL_SORT=0|1
+```
+
+Default behavior stays safe for users without Pixel Drop Dispatcher:
+
+- `SORTIFY_DISPATCHER_INTEGRATION=auto`
+- `SORTIFY_HOLD_PROTECTED=1`
+- `SORTIFY_NORMAL_SORT=1`
+
+`auto` uses dispatcher-aware protected artifact holding only when Pixel Drop Dispatcher runtime is present and healthy. If dispatcher is absent, normal downloads keep sorting and protected artifacts are not hard-blocked by a missing dispatcher runtime.
+<!-- SORTIFY_OPTIONAL_DISPATCHER_IMPLEMENTED_20260517_END -->

@@ -12,7 +12,7 @@
         h1 { color: #bb86fc; font-size: 1.45rem; }
         h2 { color: #d7b7ff; font-size: 1rem; }
         label { display: block; margin-bottom: 8px; color: #b0b0b0; }
-        input { width: 100%; padding: 12px; margin-bottom: 12px; background: #2c2c2c; border: 1px solid #3a3a3a; color: white; border-radius: 8px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 12px; margin-bottom: 12px; background: #2c2c2c; border: 1px solid #3a3a3a; color: white; border-radius: 8px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; margin: 6px 0; background: #bb86fc; color: #000; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
         button.secondary { background: #2f2f2f; color: #fff; border: 1px solid #444; }
         button.warn { background: #ffd166; color: #111; }
@@ -37,11 +37,22 @@
         <input type="number" id="interval" placeholder="300" min="30">
         <label>Guard logging</label>
         <input type="number" id="guardLog" placeholder="1" min="0" max="1">
+        <label>Normal sorting</label>
+        <input type="number" id="normalSort" placeholder="1" min="0" max="1">
+        <label>Hold protected artifacts</label>
+        <input type="number" id="holdProtected" placeholder="1" min="0" max="1">
+        <label>Dispatcher integration</label>
+        <select id="dispatcherIntegration">
+            <option value="off">off - no dispatcher dependency</option>
+            <option value="auto">auto - use dispatcher only when healthy</option>
+            <option value="on">on - require dispatcher</option>
+        </select>
         <button onclick="saveConfig()">Save Settings</button>
     </div>
 
     <div class="card">
         <h2>Actions</h2>
+        <button onclick="runAction('--config-status')">Config Status</button>
         <button onclick="runAction('--guard-status')">Guard Status</button>
         <button class="warn" onclick="runAction('--guard-clean')">Guard Clean: restore misplaced artifacts</button>
         <button class="secondary" onclick="runAction('--dispatcher-status')">Dispatcher Link Status</button>
@@ -60,8 +71,17 @@
 const CONF_PATH = "/data/adb/modules/sortify/sortify.conf";
 const ACTION = "sh /data/adb/modules/sortify/action.sh";
 
-function shellQuote(value) {
+function shellNumber(value) {
     return String(value).replace(/[^0-9]/g, "");
+}
+
+function shellMode(value) {
+    const v = String(value || "auto");
+    return ["off", "auto", "on"].includes(v) ? v : "auto";
+}
+
+function shellSingleQuote(value) {
+    return "'" + String(value).replace(/'/g, "'\\''") + "'";
 }
 
 async function execCmd(cmd) {
@@ -75,9 +95,18 @@ async function loadConfig() {
         const out = await execCmd(`cat "${CONF_PATH}" 2>/dev/null || true`);
         const interval = out.match(/^INTERVAL=(\d+)/m);
         const guardLog = out.match(/^GUARD_LOG=([01])/m);
+        const normalSort = out.match(/^SORTIFY_NORMAL_SORT=([01])/m);
+        const holdProtected = out.match(/^SORTIFY_HOLD_PROTECTED=([01])/m);
+        const dispatcherIntegration = out.match(/^SORTIFY_DISPATCHER_INTEGRATION=(off|auto|on)/m);
         if (interval) document.getElementById('interval').value = interval[1];
         if (guardLog) document.getElementById('guardLog').value = guardLog[1];
+        if (normalSort) document.getElementById('normalSort').value = normalSort[1];
+        if (holdProtected) document.getElementById('holdProtected').value = holdProtected[1];
+        if (dispatcherIntegration) document.getElementById('dispatcherIntegration').value = dispatcherIntegration[1];
         if (!guardLog) document.getElementById('guardLog').value = "1";
+        if (!normalSort) document.getElementById('normalSort').value = "1";
+        if (!holdProtected) document.getElementById('holdProtected').value = "1";
+        if (!dispatcherIntegration) document.getElementById('dispatcherIntegration').value = "auto";
         document.getElementById('output').textContent = out || "Config not found yet.";
     } catch (e) {
         document.getElementById('output').textContent = "Read error: " + e;
@@ -85,13 +114,16 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
-    const interval = shellQuote(document.getElementById('interval').value || "300");
-    const guardLog = shellQuote(document.getElementById('guardLog').value || "1");
+    const interval = shellNumber(document.getElementById('interval').value || "300");
+    const guardLog = shellNumber(document.getElementById('guardLog').value || "1");
+    const normalSort = shellNumber(document.getElementById('normalSort').value || "1");
+    const holdProtected = shellNumber(document.getElementById('holdProtected').value || "1");
+    const dispatcherIntegration = shellMode(document.getElementById('dispatcherIntegration').value || "auto");
     if (!interval) return showToast("Interval missing");
-    const content = `INTERVAL=${interval}\nGUARD_LOG=${guardLog}\n`;
+    const content = `INTERVAL=${interval}\nGUARD_LOG=${guardLog}\nSORTIFY_NORMAL_SORT=${normalSort}\nSORTIFY_HOLD_PROTECTED=${holdProtected}\nSORTIFY_DISPATCHER_INTEGRATION=${dispatcherIntegration}\n`;
     try {
-        await execCmd(`cat > "${CONF_PATH}" <<'EOF'\n${content}EOF`);
-        showToast(`Saved: ${interval}s, guard log ${guardLog}`);
+        await execCmd(`printf %s ${shellSingleQuote(content)} > "${CONF_PATH}"`);
+        showToast(`Saved: ${interval}s, sort ${normalSort}, hold ${holdProtected}, dispatcher ${dispatcherIntegration}`);
         await loadConfig();
     } catch (e) {
         showToast("Save error");
