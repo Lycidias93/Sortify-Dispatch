@@ -29,3 +29,18 @@ The visible module name is `Sortify Dispatch`, but the module ID remains `sortif
 ## Rationale
 
 Sortify sorts by file extension. Operational artifacts often share normal extensions such as `.zip`, `.sh`, `.py`, `.apk`, `.tar.gz`, or `.txt`. Without explicit protection, these files can be moved into `/sdcard/Sortify`, breaking repeatable Dispatcher and Pixel/Termux workflows.
+
+<!-- HOLD_RELEASE_CONTRACT_20260517_START -->
+## Hold / release contract
+
+Sortify Dispatch uses an explicit hold/release model for operational artifacts.
+
+- Normal downloads are sorted automatically.
+- Dispatcher target artifacts stay in `/sdcard/Download` until Pixel Drop Dispatcher releases them after successful delivery to every resolved target.
+- `pixel_local__*`, Termux helper artifacts, and repo helper artifacts stay in `/sdcard/Download` until Termux / the local operator workflow releases them.
+- Release markers must match file identity by at least basename, size, and SHA256.
+- Same-named conflicts must not be overwritten; conflict copies stay under `GuardConflicts`.
+- Public Dispatcher release work must wait until the private/proven Dispatcher release implements and verifies this contract.
+
+Details: `docs/HOLD_RELEASE_CONTRACT.md`.
+<!-- HOLD_RELEASE_CONTRACT_20260517_END -->

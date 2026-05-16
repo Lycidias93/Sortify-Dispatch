@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Documented the Artifact Hold / Release Contract for Dispatcher, Termux, and Sortify interaction.
+- Clarified that normal downloads continue to sort automatically and only operational workflow artifacts are held.
+- Added public Dispatcher release gate: public release follows private/proven Dispatcher release verification.
+
+
 ## v4.1-guard-tools - 2026-05-16
 
 - Added `--guard-status` to audit protected artifacts in Download and misplaced protected artifacts in Sortify folders.

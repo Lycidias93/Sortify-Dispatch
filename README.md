@@ -39,6 +39,11 @@ su -c sh /data/adb/modules/sortify/action.sh --dispatcher-status
 
 Sortify Dispatch does not control Pixel Drop Dispatcher. It only provides read-only dispatcher link status and protects dispatcher-related artifacts from being sorted away.
 
+
+## Hold / release contract
+
+Sortify Dispatch holds only operational artifacts. Normal downloads are sorted automatically. Dispatcher target artifacts require Dispatcher release after successful delivery to every target; Pixel-local and Termux artifacts require explicit Termux/operator release. See `docs/HOLD_RELEASE_CONTRACT.md`.
+
 ## Installation
 
 1. Download `Sortify-Dispatch-v4.1-guard-tools.zip` from Releases.
