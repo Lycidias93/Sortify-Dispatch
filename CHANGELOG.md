@@ -22,3 +22,12 @@
 - Forked Sortify v4.0 as Sortify Dispatch.
 - Added Artifact Guard for Dispatcher, Pixel-local, Termux, Magisk/KernelSU release, and repo helper artifacts.
 - Published `Sortify-Dispatch-v4.0-artifact-guard.zip` with SHA256.
+
+<!-- SORTIFY_VNEXT_OPTIONAL_DISPATCHER_INTEGRATION_20260517_START -->
+## 2026-05-17 - vNext optional dispatcher integration design
+
+- Documented that Sortify must remain usable without Pixel Drop Dispatcher.
+- Planned config flag: `SORTIFY_DISPATCHER_INTEGRATION=off|auto|on`.
+- Planned default: `auto`, with safe fallback when dispatcher runtime is missing.
+- Documented that unrelated downloads continue to sort and must not be held.
+<!-- SORTIFY_VNEXT_OPTIONAL_DISPATCHER_INTEGRATION_20260517_END -->

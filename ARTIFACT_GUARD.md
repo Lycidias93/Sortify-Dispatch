@@ -44,3 +44,16 @@ Sortify Dispatch uses an explicit hold/release model for operational artifacts.
 
 Details: `docs/HOLD_RELEASE_CONTRACT.md`.
 <!-- HOLD_RELEASE_CONTRACT_20260517_END -->
+
+<!-- SORTIFY_HOLD_RELEASE_OPTIONAL_CONTRACT_20260517_START -->
+## Optional hold/release contract
+
+The dispatcher hold/release contract is optional.
+
+Required behavior:
+- users without dispatcher can disable dispatcher integration
+- protected operational artifacts may be held only when integration is enabled
+- unrelated downloads must not be held because no dispatcher is present
+- if integration is `auto`, missing dispatcher runtime degrades to disabled behavior
+- if integration is `on`, missing dispatcher runtime is a clear configuration error
+<!-- SORTIFY_HOLD_RELEASE_OPTIONAL_CONTRACT_20260517_END -->

@@ -85,3 +85,17 @@ See `CHANGELOG.md`.
 
 - Original Sortify module by [xCaptaiN09](https://github.com/xCaptaiN09)
 - Artifact Guard fork maintained by [Lycidias93](https://github.com/Lycidias93)
+
+<!-- SORTIFY_OPTIONAL_DISPATCHER_INTEGRATION_20260517_START -->
+## Optional Dispatcher Integration
+
+Sortify remains usable without Pixel Drop Dispatcher.
+
+vNext design target:
+- `SORTIFY_DISPATCHER_INTEGRATION=off|auto|on`
+- default: `auto`
+- `off`: normal Sortify behavior, no dispatcher runtime dependency
+- `auto`: use dispatcher hold/release contract only when runtime is present and healthy
+- `on`: require dispatcher contract and fail clearly if unavailable
+- normal downloads must continue to sort even when dispatcher integration is disabled
+<!-- SORTIFY_OPTIONAL_DISPATCHER_INTEGRATION_20260517_END -->
