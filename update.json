@@ -1,6 +1,6 @@
 {
-  "version": "4.0-artifact-guard",
-  "versionCode": 11,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.0-artifact-guard/Sortify-Dispatch-v4.0-artifact-guard.zip",
+  "version": "4.1-guard-tools",
+  "versionCode": 12,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.1-guard-tools/Sortify-Dispatch-v4.1-guard-tools.zip",
   "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/CHANGELOG.md"
 }

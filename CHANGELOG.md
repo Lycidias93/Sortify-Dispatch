@@ -1,17 +1,17 @@
 # Changelog
 
+## v4.1-guard-tools - 2026-05-16
+
+- Added `--guard-status` to audit protected artifacts in Download and misplaced protected artifacts in Sortify folders.
+- Added safe `--guard-clean` to restore misplaced Dispatcher, Pixel, Termux, release, and repo helper artifacts to Download.
+- Guard clean never overwrites existing Download files; collisions move to `/sdcard/Sortify/GuardConflicts/<timestamp>/`.
+- Added read-only `--dispatcher-status` link check for Pixel Drop Dispatcher runtime metadata.
+- Improved KernelSU WebUI with interval config, guard logging toggle, guard status, safe guard clean, dispatcher link status, and manual sort.
+- Updated online update metadata to `Lycidias93/Sortify-Dispatch` release `v4.1-guard-tools`.
+- Added repo build and smoke gates.
+
 ## v4.0-artifact-guard - 2026-05-16
 
-- Add Artifact Guard for Pixel Drop Dispatcher target artifacts.
-- Keep Pixel-local and Termux helper scripts in `/sdcard/Download`.
-- Keep dispatcher, Sortify Dispatch, and Magisk/KernelSU release ZIPs in `/sdcard/Download`.
-- Keep repo helper scripts in `/sdcard/Download`.
-- Keep normal Sortify categories and duplicate handling.
-- Replace non-portable `read -d` loops with POSIX-compatible `find -print | read -r` loops for Android shell compatibility.
-
-## v4.0 upstream baseline
-
-- Native KernelSU WebUI support.
-- Background sorting service.
-- Manual action trigger.
-- Documents, Images, Videos, Audio, Archives, Apps, Others, and Duplicates categories.
+- Forked Sortify v4.0 as Sortify Dispatch.
+- Added Artifact Guard for Dispatcher, Pixel-local, Termux, Magisk/KernelSU release, and repo helper artifacts.
+- Published `Sortify-Dispatch-v4.0-artifact-guard.zip` with SHA256.

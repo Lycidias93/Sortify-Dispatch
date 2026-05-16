@@ -2,81 +2,123 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sortify</title>
+    <title>Sortify Dispatch</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; display: flex; justify-content: center; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; width: 100%; max-width: 350px; }
-        h2 { margin-top: 0; color: #bb86fc; }
+        :root { color-scheme: dark; }
+        body { font-family: system-ui, sans-serif; background: #121212; color: #e0e0e0; margin: 0; padding: 18px; }
+        .wrap { max-width: 560px; margin: 0 auto; }
+        .card { background: #1e1e1e; padding: 18px; border-radius: 14px; margin-bottom: 14px; border: 1px solid #2b2b2b; }
+        h1, h2 { margin-top: 0; }
+        h1 { color: #bb86fc; font-size: 1.45rem; }
+        h2 { color: #d7b7ff; font-size: 1rem; }
         label { display: block; margin-bottom: 8px; color: #b0b0b0; }
-        input { width: 100%; padding: 12px; margin-bottom: 20px; background: #2c2c2c; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #bb86fc; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 2px; padding: 16px; position: fixed; z-index: 1; bottom: 30px; left: 50%; transform: translateX(-50%); }
-        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
-        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
-        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+        input { width: 100%; padding: 12px; margin-bottom: 12px; background: #2c2c2c; border: 1px solid #3a3a3a; color: white; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin: 6px 0; background: #bb86fc; color: #000; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+        button.secondary { background: #2f2f2f; color: #fff; border: 1px solid #444; }
+        button.warn { background: #ffd166; color: #111; }
+        pre { white-space: pre-wrap; word-break: break-word; background: #101010; border: 1px solid #303030; border-radius: 10px; padding: 12px; min-height: 80px; }
+        .muted { color: #9a9a9a; font-size: .9rem; }
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 14px; position: fixed; z-index: 1; bottom: 24px; left: 50%; transform: translateX(-50%); }
+        #toast.show { visibility: visible; animation: fadein 0.25s, fadeout 0.35s 2.4s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 24px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 24px; opacity: 1;} to {bottom: 0; opacity: 0;} }
     </style>
 </head>
 <body>
+<div class="wrap">
+    <div class="card">
+        <h1>Sortify Dispatch</h1>
+        <p class="muted">v4.1 Guard Tools · repo-owned online updates · Dispatcher link status</p>
+    </div>
 
     <div class="card">
-        <h2>Sortify Config</h2>
-        <label>Sort Interval (seconds)</label>
-        <input type="number" id="interval" placeholder="300">
+        <h2>Configuration</h2>
+        <label>Sort interval in seconds</label>
+        <input type="number" id="interval" placeholder="300" min="30">
+        <label>Guard logging</label>
+        <input type="number" id="guardLog" placeholder="1" min="0" max="1">
         <button onclick="saveConfig()">Save Settings</button>
     </div>
 
-    <div id="toast">Settings Saved!</div>
+    <div class="card">
+        <h2>Actions</h2>
+        <button onclick="runAction('--guard-status')">Guard Status</button>
+        <button class="warn" onclick="runAction('--guard-clean')">Guard Clean: restore misplaced artifacts</button>
+        <button class="secondary" onclick="runAction('--dispatcher-status')">Dispatcher Link Status</button>
+        <button class="secondary" onclick="runAction('--sort')">Run Sort Now</button>
+    </div>
 
-    <script>
-        // File path for the config
-        const CONF_PATH = "/data/adb/modules/sortify/sortify.conf";
+    <div class="card">
+        <h2>Output</h2>
+        <pre id="output">Open in KernelSU WebUI, then tap an action.</pre>
+    </div>
+</div>
 
-        // 1. Read existing config when page loads
-        async function loadConfig() {
-            try {
-                // ksu.exec runs a shell command and returns output
-                const { stdout } = await ksu.exec(`cat "${CONF_PATH}"`);
-                // Parse "INTERVAL=300" to extract just "300"
-                const match = stdout.match(/INTERVAL=(\d+)/);
-                if (match) {
-                    document.getElementById('interval').value = match[1];
-                }
-            } catch (e) {
-                console.error("Read Error:", e);
-            }
-        }
+<div id="toast">Done</div>
 
-        // 2. Save new config
-        async function saveConfig() {
-            const val = document.getElementById('interval').value;
-            if (!val) return;
+<script>
+const CONF_PATH = "/data/adb/modules/sortify/sortify.conf";
+const ACTION = "sh /data/adb/modules/sortify/action.sh";
 
-            try {
-                // Write the value back to the file
-                await ksu.exec(`echo "INTERVAL=${val}" > "${CONF_PATH}"`);
-                
-                // Show success message
-                showToast("Saved! Interval set to " + val + "s");
-            } catch (e) {
-                showToast("Error: " + e);
-            }
-        }
+function shellQuote(value) {
+    return String(value).replace(/[^0-9]/g, "");
+}
 
-        function showToast(msg) {
-            const x = document.getElementById("toast");
-            x.innerText = msg;
-            x.className = "show";
-            setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
-        }
+async function execCmd(cmd) {
+    if (typeof ksu === 'undefined') throw new Error("KernelSU WebUI API not available");
+    const result = await ksu.exec(cmd);
+    return (result.stdout || "") + (result.stderr || "");
+}
 
-        // Initialize
-        if (typeof ksu !== 'undefined') {
-            loadConfig();
-        } else {
-            // Fallback for browser testing (mock)
-            console.log("Not in KernelSU");
-        }
-    </script>
+async function loadConfig() {
+    try {
+        const out = await execCmd(`cat "${CONF_PATH}" 2>/dev/null || true`);
+        const interval = out.match(/^INTERVAL=(\d+)/m);
+        const guardLog = out.match(/^GUARD_LOG=([01])/m);
+        if (interval) document.getElementById('interval').value = interval[1];
+        if (guardLog) document.getElementById('guardLog').value = guardLog[1];
+        if (!guardLog) document.getElementById('guardLog').value = "1";
+        document.getElementById('output').textContent = out || "Config not found yet.";
+    } catch (e) {
+        document.getElementById('output').textContent = "Read error: " + e;
+    }
+}
 
+async function saveConfig() {
+    const interval = shellQuote(document.getElementById('interval').value || "300");
+    const guardLog = shellQuote(document.getElementById('guardLog').value || "1");
+    if (!interval) return showToast("Interval missing");
+    const content = `INTERVAL=${interval}\nGUARD_LOG=${guardLog}\n`;
+    try {
+        await execCmd(`cat > "${CONF_PATH}" <<'EOF'\n${content}EOF`);
+        showToast(`Saved: ${interval}s, guard log ${guardLog}`);
+        await loadConfig();
+    } catch (e) {
+        showToast("Save error");
+        document.getElementById('output').textContent = String(e);
+    }
+}
+
+async function runAction(arg) {
+    document.getElementById('output').textContent = "Running " + arg + " ...";
+    try {
+        const out = await execCmd(`${ACTION} ${arg}`);
+        document.getElementById('output').textContent = out || "No output";
+        showToast("Done");
+    } catch (e) {
+        document.getElementById('output').textContent = "Action error: " + e;
+        showToast("Action failed");
+    }
+}
+
+function showToast(msg) {
+    const x = document.getElementById("toast");
+    x.innerText = msg;
+    x.className = "show";
+    setTimeout(function(){ x.className = x.className.replace("show", ""); }, 2800);
+}
+
+if (typeof ksu !== 'undefined') loadConfig();
+</script>
 </body>
 </html>

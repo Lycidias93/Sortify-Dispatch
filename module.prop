@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.0-artifact-guard
-versionCode=11
+version=4.1-guard-tools
+versionCode=12
 author=xCaptaiN09 + Lycidias93
-description=Sortify v4.0 with Artifact Guard for Pixel Drop Dispatcher, Pixel local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
+description=Sortify v4.1 with Artifact Guard, guard status, safe guard clean, Dispatcher link status, improved WebUI, and repo-owned online updates.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
