@@ -1,6 +1,6 @@
 {
-  "version": "4.1-guard-tools",
-  "versionCode": 12,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.1-guard-tools/Sortify-Dispatch-v4.1-guard-tools.zip",
+  "version": "4.2-optional-dispatcher",
+  "versionCode": 13,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.2-optional-dispatcher/Sortify-Dispatch-v4.2-optional-dispatcher.zip",
   "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/CHANGELOG.md"
 }

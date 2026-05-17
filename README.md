@@ -6,7 +6,7 @@
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.1-guard-tools
+**Version:** 4.2-optional-dispatcher
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for Pixel Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -46,7 +46,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-v4.1-guard-tools.zip` from Releases.
+1. Download `Sortify-Dispatch-v4.2-optional-dispatcher.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.
@@ -123,3 +123,15 @@ Default behavior stays safe for users without Pixel Drop Dispatcher:
 
 `auto` uses dispatcher-aware protected artifact holding only when Pixel Drop Dispatcher runtime is present and healthy. If dispatcher is absent, normal downloads keep sorting and protected artifacts are not hard-blocked by a missing dispatcher runtime.
 <!-- SORTIFY_OPTIONAL_DISPATCHER_IMPLEMENTED_20260517_END -->
+
+## Release 4.2-optional-dispatcher
+
+This release promotes optional dispatcher integration controls from verified source/runtime smoke to public release:
+
+- `SORTIFY_DISPATCHER_INTEGRATION=off|auto|on`
+- `SORTIFY_HOLD_PROTECTED=0|1`
+- `SORTIFY_NORMAL_SORT=0|1`
+- WebUI controls for normal sorting, protected hold, and dispatcher integration mode
+- `--config-status` action output
+
+Users without Pixel Drop Dispatcher can use `off` or the default `auto` mode safely.

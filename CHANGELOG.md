@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-17 - v4.2-optional-dispatcher
+
+- Released optional dispatcher integration controls.
+- Added config flags: `SORTIFY_DISPATCHER_INTEGRATION=off|auto|on`, `SORTIFY_HOLD_PROTECTED=0|1`, `SORTIFY_NORMAL_SORT=0|1`.
+- Added WebUI controls for normal sort, protected hold, and dispatcher integration mode.
+- Added `--config-status` output and verified active Pixel runtime smoke.
+- Default remains safe for users without Pixel Drop Dispatcher: `auto`, protected hold enabled, normal sorting enabled.
+
 ## Unreleased
 
 - Documented the Artifact Hold / Release Contract for Dispatcher, Termux, and Sortify interaction.
