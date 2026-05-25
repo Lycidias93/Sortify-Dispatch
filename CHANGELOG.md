@@ -1,3 +1,13 @@
+<!-- SORTIFY_PIDD_V4110_CONTRACT_20260525_START -->
+## 2026-05-25 - PIDD v4.11 Sortify marker contract candidate
+
+- Added final `policy=v4115` release gate for Pixel Drop Dispatcher markers.
+- Added SHA/size/authority/pending target validation before protected artifacts are released from Download.
+- Kept `off` mode independent from Pixel Drop Dispatcher.
+- Kept `auto` mode active only when PIDD runtime and marker directory are healthy.
+- Treated older RC marker policies as evidence, not final release.
+<!-- SORTIFY_PIDD_V4110_CONTRACT_20260525_END -->
+
 # Changelog
 
 ## 2026-05-17 - v4.2-optional-dispatcher
