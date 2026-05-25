@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.2-optional-dispatcher
-versionCode=13
+version=4.3-pidd-v4115-contract
+versionCode=14
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch v4.2 with optional Pixel Drop Dispatcher integration controls, protected hold toggles, normal sort toggle, WebUI controls, and guard tools.
+description=Sortify Dispatch v4.3 with PIDD v4.11.0/4115 marker release contract, optional dispatcher integration controls, protected hold, normal sort toggle, WebUI controls, and guard tools.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
