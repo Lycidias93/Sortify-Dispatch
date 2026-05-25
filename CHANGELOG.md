@@ -1,3 +1,11 @@
+## 2026-05-25 - v4.3-pidd-v4115-contract
+
+- Released the PIDD v4.11.0 / policy v4115 Sortify marker contract.
+- Dispatcher release markers are accepted only with released=yes, authority=dispatcher, matching sha256, matching size, policy=v4115, and empty pending_targets.
+- Missing marker, partial delivery, legacy policy, SHA/size mismatch, or non-dispatcher authority keeps protected artifacts held in Download.
+- Normal unrelated downloads continue to sort automatically.
+- Static synthetic smoke and staged runtime config smoke were green before release packaging.
+
 <!-- SORTIFY_PIDD_V4110_CONTRACT_20260525_START -->
 ## 2026-05-25 - PIDD v4.11 Sortify marker contract candidate
 
