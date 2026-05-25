@@ -135,3 +135,28 @@ This release promotes optional dispatcher integration controls from verified sou
 - `--config-status` action output
 
 Users without Pixel Drop Dispatcher can use `off` or the default `auto` mode safely.
+
+<!-- SORTIFY_PIDD_V4110_CONTRACT_20260525_START -->
+## PIDD v4.11 Sortify contract
+
+Stand: `2026-05-25`.
+
+Sortify Dispatch can use Pixel Drop Dispatcher release markers when `SORTIFY_DISPATCHER_INTEGRATION=auto` or `on` and the PIDD runtime is healthy.
+
+Required final marker contract:
+
+- `released=yes`
+- `authority=dispatcher`
+- `sha256` matches the local Download artifact
+- `size` matches the local Download artifact
+- `policy=v4115`
+- `pending_targets` is empty
+
+Protected dispatcher artifacts stay in Download when no valid final marker exists. `released=no`, non-empty `pending_targets`, missing markers, SHA/size mismatches, non-`dispatcher` authority, or older RC policies such as `v4112`/`v4114` are treated as held evidence, not final release.
+
+Modes:
+
+- `off`: ignore dispatcher runtime and marker contract.
+- `auto`: use the contract only when PIDD runtime and marker directory are healthy.
+- `on`: require a healthy PIDD runtime and marker directory; otherwise sorting fails clearly.
+<!-- SORTIFY_PIDD_V4110_CONTRACT_20260525_END -->

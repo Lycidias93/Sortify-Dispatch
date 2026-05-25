@@ -14,6 +14,8 @@ SORTIFY_DISPATCHER_INTEGRATION="${SORTIFY_DISPATCHER_INTEGRATION:-auto}"
 SORTIFY_HOLD_PROTECTED="${SORTIFY_HOLD_PROTECTED:-1}"
 SORTIFY_NORMAL_SORT="${SORTIFY_NORMAL_SORT:-1}"
 PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
+PIDD_SORTIFY_REQUIRED_POLICY="${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}"
+PIDD_SORTIFY_RELEASE_DIR="${PIDD_SORTIFY_RELEASE_DIR:-$PIDD_RUNTIME_DIR/integration/sortify-release}"
 
 if [ -f "$CONF_PATH" ]; then
     # shellcheck disable=SC1090
@@ -38,7 +40,10 @@ normalize_config() {
     esac
 
     PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
+    PIDD_SORTIFY_REQUIRED_POLICY="${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}"
+    PIDD_SORTIFY_RELEASE_DIR="${PIDD_SORTIFY_RELEASE_DIR:-$PIDD_RUNTIME_DIR/integration/sortify-release}"
 }
+
 
 normalize_config
 # SORTIFY_OPTIONAL_DISPATCHER_CONFIG_V1_END
@@ -62,13 +67,28 @@ log_guard() {
 }
 
 
-# SORTIFY_DISPATCHER_STATE_V1_START
+# SORTIFY_PIDD_V4110_CONTRACT_V1_START
 dispatcher_health_ok() {
     runtime="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
     health="$runtime/health.env"
     [ -d "$runtime" ] || return 1
     [ -f "$health" ] || return 1
-    ( . "$health" 2>/dev/null && [ "${status:-}" = "OK" ] ) >/dev/null 2>&1
+    (
+        . "$health" 2>/dev/null || exit 1
+        [ "${status:-}" = "OK" ] || exit 1
+        [ "${inflight_bytes:-0}" = "0" ] || exit 1
+    ) >/dev/null 2>&1
+}
+
+dispatcher_marker_dir_ok() {
+    normalize_config
+    [ -d "$PIDD_SORTIFY_RELEASE_DIR" ] || return 1
+    [ -r "$PIDD_SORTIFY_RELEASE_DIR" ] || return 1
+}
+
+dispatcher_contract_ok() {
+    dispatcher_health_ok || return 1
+    dispatcher_marker_dir_ok || return 1
 }
 
 dispatcher_integration_state() {
@@ -78,14 +98,14 @@ dispatcher_integration_state() {
             echo "disabled"
             ;;
         on)
-            if dispatcher_health_ok; then
+            if dispatcher_contract_ok; then
                 echo "active"
             else
                 echo "required_missing"
             fi
             ;;
         auto|*)
-            if dispatcher_health_ok; then
+            if dispatcher_contract_ok; then
                 echo "active"
             else
                 echo "auto_inactive"
@@ -100,12 +120,125 @@ dispatcher_integration_active() {
 
 require_dispatcher_if_needed() {
     normalize_config
-    if [ "$SORTIFY_DISPATCHER_INTEGRATION" = "on" ] && ! dispatcher_health_ok; then
-        ui_print "ERROR: dispatcher integration required but Pixel Drop Dispatcher runtime is not healthy"
-        log_guard "dispatcher required but missing_or_unhealthy runtime=${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
+    if [ "$SORTIFY_DISPATCHER_INTEGRATION" = "on" ] && ! dispatcher_contract_ok; then
+        ui_print "ERROR: dispatcher integration required but Pixel Drop Dispatcher runtime/marker directory is not healthy"
+        log_guard "dispatcher required but missing_or_unhealthy runtime=${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch} release_dir=${PIDD_SORTIFY_RELEASE_DIR:-}"
         return 3
     fi
     return 0
+}
+
+file_sha256() {
+    file="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" 2>/dev/null | while read -r h rest; do printf '%s' "$h"; done
+        return 0
+    fi
+    if command -v toybox >/dev/null 2>&1 && toybox --list 2>/dev/null | grep -qx sha256sum; then
+        toybox sha256sum "$file" 2>/dev/null | while read -r h rest; do printf '%s' "$h"; done
+        return 0
+    fi
+    return 1
+}
+
+file_size_bytes() {
+    wc -c < "$1" 2>/dev/null | tr -d ' ' 2>/dev/null
+}
+
+marker_field() {
+    marker="$1"
+    key="$2"
+    sed -n "s/^${key}=//p" "$marker" 2>/dev/null | sed -n '1p'
+}
+
+marker_unquote() {
+    v="$1"
+    case "$v" in
+        "''") v="" ;;
+        \'*\') v=${v#\'}; v=${v%\'} ;;
+    esac
+    printf '%s' "$v"
+}
+
+marker_pending_empty() {
+    pending="$(marker_unquote "$1")"
+    [ -z "$pending" ]
+}
+
+pidd_sortify_marker_path() {
+    file="$1"
+    sha="$(file_sha256 "$file" 2>/dev/null || true)"
+    [ -n "$sha" ] || return 1
+    printf '%s/%s.env' "$PIDD_SORTIFY_RELEASE_DIR" "$sha"
+}
+
+pidd_sortify_contract_released() {
+    normalize_config
+    file="$1"
+    [ -f "$file" ] || return 1
+    sha="$(file_sha256 "$file" 2>/dev/null || true)"
+    size="$(file_size_bytes "$file" 2>/dev/null || true)"
+    [ -n "$sha" ] || return 1
+    [ -n "$size" ] || return 1
+    marker="$PIDD_SORTIFY_RELEASE_DIR/$sha.env"
+    [ -f "$marker" ] || return 1
+
+    released="$(marker_field "$marker" released)"
+    authority="$(marker_field "$marker" authority)"
+    marker_sha="$(marker_field "$marker" sha256)"
+    marker_size="$(marker_field "$marker" size)"
+    policy="$(marker_field "$marker" policy)"
+    pending="$(marker_field "$marker" pending_targets)"
+
+    [ "$released" = "yes" ] || return 1
+    [ "$authority" = "dispatcher" ] || return 1
+    [ "$marker_sha" = "$sha" ] || return 1
+    [ "$marker_size" = "$size" ] || return 1
+    [ "$policy" = "$PIDD_SORTIFY_REQUIRED_POLICY" ] || return 1
+    marker_pending_empty "$pending" || return 1
+    return 0
+}
+
+pidd_sortify_contract_status() {
+    normalize_config
+    file="$1"
+    [ -f "$file" ] || { echo "missing_local_file"; return 0; }
+    sha="$(file_sha256 "$file" 2>/dev/null || true)"
+    size="$(file_size_bytes "$file" 2>/dev/null || true)"
+    if [ -z "$sha" ]; then
+        echo "held:no_sha"
+        return 0
+    fi
+    marker="$PIDD_SORTIFY_RELEASE_DIR/$sha.env"
+    if [ ! -f "$marker" ]; then
+        echo "held:marker_missing"
+        return 0
+    fi
+    released="$(marker_field "$marker" released)"
+    authority="$(marker_field "$marker" authority)"
+    marker_sha="$(marker_field "$marker" sha256)"
+    marker_size="$(marker_field "$marker" size)"
+    policy="$(marker_field "$marker" policy)"
+    pending="$(marker_unquote "$(marker_field "$marker" pending_targets)")"
+    reason="$(marker_unquote "$(marker_field "$marker" reason)")"
+
+    if pidd_sortify_contract_released "$file"; then
+        echo "released:policy=$policy reason=$reason"
+        return 0
+    fi
+    if [ "$released" = "no" ]; then
+        echo "held:released_no policy=$policy pending=$pending reason=$reason"
+    elif [ "$policy" != "$PIDD_SORTIFY_REQUIRED_POLICY" ]; then
+        echo "held:policy_mismatch got=$policy required=$PIDD_SORTIFY_REQUIRED_POLICY"
+    elif [ "$authority" != "dispatcher" ]; then
+        echo "held:authority_mismatch got=$authority"
+    elif [ "$marker_sha" != "$sha" ] || [ "$marker_size" != "$size" ]; then
+        echo "held:sha_or_size_mismatch"
+    elif [ -n "$pending" ]; then
+        echo "held:pending_targets=$pending"
+    else
+        echo "held:not_released released=$released policy=$policy"
+    fi
 }
 
 should_hold_protected_artifact() {
@@ -113,19 +246,31 @@ should_hold_protected_artifact() {
     [ "${SORTIFY_HOLD_PROTECTED:-1}" = "1" ] || return 1
     is_protected_artifact "$name" || return 1
 
-    case "${SORTIFY_DISPATCHER_INTEGRATION:-auto}" in
-        off)
+    state="$(dispatcher_integration_state)"
+    case "$state" in
+        disabled|auto_inactive)
             return 1
             ;;
-        on)
+        required_missing)
             return 0
             ;;
-        auto|*)
-            dispatcher_integration_active
+        active)
+            ;;
+        *)
+            return 0
             ;;
     esac
+
+    file="${DOWNLOADS:-/storage/emulated/0/Download}/$name"
+    if pidd_sortify_contract_released "$file"; then
+        log_guard "release protected artifact file=$name contract=$(pidd_sortify_contract_status "$file")"
+        return 1
+    fi
+
+    log_guard "hold protected artifact file=$name integration=$state contract=$(pidd_sortify_contract_status "$file")"
+    return 0
 }
-# SORTIFY_DISPATCHER_STATE_V1_END
+# SORTIFY_PIDD_V4110_CONTRACT_V1_END
 
 DOC_EXT="pdf doc docx txt xls xlsx ppt pptx csv md log json yaml yml xml"
 IMG_EXT="jpg jpeg png gif bmp webp heic heif svg"
@@ -334,7 +479,12 @@ sortify_config_status() {
     echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"
     echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"
     echo "pidd_runtime_dir=$PIDD_RUNTIME_DIR"
+    echo "pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
+    echo "sortify_contract=policy_v4115_sha_size_authority_pending"
     echo "dispatcher_integration_state=$(dispatcher_integration_state)"
+    echo "pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
 }
 
 dispatcher_status() {
