@@ -6,7 +6,7 @@
     <style>
         :root { color-scheme: dark; }
         body { font-family: system-ui, sans-serif; background: #121212; color: #e0e0e0; margin: 0; padding: 18px; }
-        .wrap { max-width: 560px; margin: 0 auto; }
+        .wrap { max-width: 620px; margin: 0 auto; }
         .card { background: #1e1e1e; padding: 18px; border-radius: 14px; margin-bottom: 14px; border: 1px solid #2b2b2b; }
         h1, h2 { margin-top: 0; }
         h1 { color: #bb86fc; font-size: 1.45rem; }
@@ -16,8 +16,10 @@
         button { width: 100%; padding: 12px; margin: 6px 0; background: #bb86fc; color: #000; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
         button.secondary { background: #2f2f2f; color: #fff; border: 1px solid #444; }
         button.warn { background: #ffd166; color: #111; }
+        button.danger { background: #ff7b7b; color: #111; }
         pre { white-space: pre-wrap; word-break: break-word; background: #101010; border: 1px solid #303030; border-radius: 10px; padding: 12px; min-height: 80px; }
         .muted { color: #9a9a9a; font-size: .9rem; }
+        .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #2a2a2a; border: 1px solid #3b3b3b; margin: 2px 4px 2px 0; font-size: .82rem; }
         #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 14px; position: fixed; z-index: 1; bottom: 24px; left: 50%; transform: translateX(-50%); }
         #toast.show { visibility: visible; animation: fadein 0.25s, fadeout 0.35s 2.4s; }
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 24px; opacity: 1;} }
@@ -28,7 +30,10 @@
 <div class="wrap">
     <div class="card">
         <h1>Sortify Dispatch</h1>
-        <p class="muted">v4.1 Guard Tools · repo-owned online updates · Dispatcher link status</p>
+        <p class="muted">v4.5 WebUI UX · Sortify-only controls · protected artifact guard</p>
+        <span class="pill">No SSH target management</span>
+        <span class="pill">No key import/export</span>
+        <span class="pill">SDD link is read-only</span>
     </div>
 
     <div class="card">
@@ -36,18 +41,35 @@
         <label>Sort interval in seconds</label>
         <input type="number" id="interval" placeholder="300" min="30">
         <label>Guard logging</label>
-        <input type="number" id="guardLog" placeholder="1" min="0" max="1">
+        <select id="guardLog">
+            <option value="1">on</option>
+            <option value="0">off</option>
+        </select>
         <label>Normal sorting</label>
-        <input type="number" id="normalSort" placeholder="1" min="0" max="1">
+        <select id="normalSort">
+            <option value="1">on</option>
+            <option value="0">off</option>
+        </select>
         <label>Hold protected artifacts</label>
-        <input type="number" id="holdProtected" placeholder="1" min="0" max="1">
-        <label>Dispatcher integration</label>
+        <select id="holdProtected">
+            <option value="1">on - recommended</option>
+            <option value="0">off - unsafe for operational artifacts</option>
+        </select>
+        <label>Dispatcher link status</label>
         <select id="dispatcherIntegration">
-            <option value="off">off - no dispatcher dependency</option>
-            <option value="auto">auto - use dispatcher only when healthy</option>
-            <option value="on">on - require dispatcher</option>
+            <option value="off">off - ignore dispatcher marker state</option>
+            <option value="auto">auto - use markers when available</option>
+            <option value="on">on - require healthy marker link</option>
         </select>
         <button onclick="saveConfig()">Save Settings</button>
+    </div>
+
+    <div class="card">
+        <h2>Mode presets</h2>
+        <button onclick="applyPreset('normal')">Normal mode: sort + hold protected artifacts</button>
+        <button class="secondary" onclick="applyPreset('safehold')">Maintenance: pause sorting, keep guard</button>
+        <button class="secondary" onclick="applyPreset('guardonly')">Guard only: no normal sorting</button>
+        <button class="danger" onclick="applyPreset('unsafe')">Unsafe: sorting without protected hold</button>
     </div>
 
     <div class="card">
@@ -55,8 +77,19 @@
         <button onclick="runAction('--config-status')">Config Status</button>
         <button onclick="runAction('--guard-status')">Guard Status</button>
         <button class="warn" onclick="runAction('--guard-clean')">Guard Clean: restore misplaced artifacts</button>
-        <button class="secondary" onclick="runAction('--dispatcher-status')">Dispatcher Link Status</button>
+        <button class="secondary" onclick="runAction('--dispatcher-status')">Dispatcher Link Status (read-only)</button>
+        <button class="secondary" onclick="runAction('--config-export')">Export Sortify Config ZIP</button>
         <button class="secondary" onclick="runAction('--sort')">Run Sort Now</button>
+    </div>
+
+    <div class="card">
+        <h2>Protected artifact examples</h2>
+        <p class="muted">Sortify protects local files by filename pattern. SSH targets are configured only in the separate dispatcher module.</p>
+        <pre>target-alpha__example.sh
+targets-alpha-beta__bundle.zip
+pixel_local__helper.py
+termux-helper.sh
+repo_update.py</pre>
     </div>
 
     <div class="card">
@@ -73,6 +106,11 @@ const ACTION = "sh /data/adb/modules/sortify/action.sh";
 
 function shellNumber(value) {
     return String(value).replace(/[^0-9]/g, "");
+}
+
+function shellFlag(value, fallback) {
+    const v = String(value || fallback);
+    return ["0", "1"].includes(v) ? v : fallback;
 }
 
 function shellMode(value) {
@@ -98,35 +136,56 @@ async function loadConfig() {
         const normalSort = out.match(/^SORTIFY_NORMAL_SORT=([01])/m);
         const holdProtected = out.match(/^SORTIFY_HOLD_PROTECTED=([01])/m);
         const dispatcherIntegration = out.match(/^SORTIFY_DISPATCHER_INTEGRATION=(off|auto|on)/m);
-        if (interval) document.getElementById('interval').value = interval[1];
-        if (guardLog) document.getElementById('guardLog').value = guardLog[1];
-        if (normalSort) document.getElementById('normalSort').value = normalSort[1];
-        if (holdProtected) document.getElementById('holdProtected').value = holdProtected[1];
-        if (dispatcherIntegration) document.getElementById('dispatcherIntegration').value = dispatcherIntegration[1];
-        if (!guardLog) document.getElementById('guardLog').value = "1";
-        if (!normalSort) document.getElementById('normalSort').value = "1";
-        if (!holdProtected) document.getElementById('holdProtected').value = "1";
-        if (!dispatcherIntegration) document.getElementById('dispatcherIntegration').value = "auto";
+        document.getElementById('interval').value = interval ? interval[1] : "300";
+        document.getElementById('guardLog').value = guardLog ? guardLog[1] : "1";
+        document.getElementById('normalSort').value = normalSort ? normalSort[1] : "1";
+        document.getElementById('holdProtected').value = holdProtected ? holdProtected[1] : "1";
+        document.getElementById('dispatcherIntegration').value = dispatcherIntegration ? dispatcherIntegration[1] : "auto";
         document.getElementById('output').textContent = out || "Config not found yet.";
     } catch (e) {
         document.getElementById('output').textContent = "Read error: " + e;
     }
 }
 
+async function writeConfig(interval, guardLog, normalSort, holdProtected, dispatcherIntegration) {
+    const content = `INTERVAL=${interval}\nGUARD_LOG=${guardLog}\nSORTIFY_NORMAL_SORT=${normalSort}\nSORTIFY_HOLD_PROTECTED=${holdProtected}\nSORTIFY_DISPATCHER_INTEGRATION=${dispatcherIntegration}\n`;
+    await execCmd(`printf %s ${shellSingleQuote(content)} > "${CONF_PATH}"`);
+    await loadConfig();
+}
+
 async function saveConfig() {
     const interval = shellNumber(document.getElementById('interval').value || "300");
-    const guardLog = shellNumber(document.getElementById('guardLog').value || "1");
-    const normalSort = shellNumber(document.getElementById('normalSort').value || "1");
-    const holdProtected = shellNumber(document.getElementById('holdProtected').value || "1");
+    const guardLog = shellFlag(document.getElementById('guardLog').value || "1", "1");
+    const normalSort = shellFlag(document.getElementById('normalSort').value || "1", "1");
+    const holdProtected = shellFlag(document.getElementById('holdProtected').value || "1", "1");
     const dispatcherIntegration = shellMode(document.getElementById('dispatcherIntegration').value || "auto");
     if (!interval) return showToast("Interval missing");
-    const content = `INTERVAL=${interval}\nGUARD_LOG=${guardLog}\nSORTIFY_NORMAL_SORT=${normalSort}\nSORTIFY_HOLD_PROTECTED=${holdProtected}\nSORTIFY_DISPATCHER_INTEGRATION=${dispatcherIntegration}\n`;
+    if (holdProtected === "0" && !confirm("Protected artifact hold will be disabled. Continue?")) return;
     try {
-        await execCmd(`printf %s ${shellSingleQuote(content)} > "${CONF_PATH}"`);
+        await writeConfig(interval, guardLog, normalSort, holdProtected, dispatcherIntegration);
         showToast(`Saved: ${interval}s, sort ${normalSort}, hold ${holdProtected}, dispatcher ${dispatcherIntegration}`);
-        await loadConfig();
     } catch (e) {
         showToast("Save error");
+        document.getElementById('output').textContent = String(e);
+    }
+}
+
+async function applyPreset(name) {
+    const interval = shellNumber(document.getElementById('interval').value || "300") || "300";
+    try {
+        if (name === "normal") {
+            await writeConfig(interval, "1", "1", "1", "auto");
+            showToast("Normal mode enabled");
+        } else if (name === "safehold" || name === "guardonly") {
+            await writeConfig(interval, "1", "0", "1", "auto");
+            showToast("Sorting paused; guard stays active");
+        } else if (name === "unsafe") {
+            if (!confirm("This disables protected artifact hold. Operational artifacts may be sorted away. Continue?")) return;
+            await writeConfig(interval, "1", "1", "0", "off");
+            showToast("Unsafe mode enabled");
+        }
+    } catch (e) {
+        showToast("Preset failed");
         document.getElementById('output').textContent = String(e);
     }
 }

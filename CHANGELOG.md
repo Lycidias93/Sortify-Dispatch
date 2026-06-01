@@ -1,3 +1,14 @@
+<!-- SORTIFY_DISPATCH_V45_WEBUI_UX_START -->
+## 4.5-webui-ux
+
+- Add Sortify-only WebUI UX refresh with current v4.5 header and explicit scope boundary.
+- Add safe WebUI mode presets: normal mode, maintenance safe-hold, guard-only and explicit unsafe sorting without protected hold.
+- Add `action.sh --config-export` for Sortify-only config export ZIPs.
+- Keep SDD target creation, SDD config import/export, SSH key handling and private runtime migration out of Sortify WebUI.
+- Keep dispatcher link status read-only and generic public artifact examples.
+
+<!-- SORTIFY_DISPATCH_V45_WEBUI_UX_END -->
+
 <!-- SORTIFY_SDD_CROSS_REPO_LINK_CHANGELOG_20260601_START -->
 ## 2026-06-01 - README cross-link to SSH Drop Dispatcher
 

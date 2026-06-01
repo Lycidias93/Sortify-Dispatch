@@ -1,3 +1,16 @@
+<!-- SORTIFY_DISPATCH_V45_WEBUI_UX_START -->
+## Sortify Dispatch v4.5 - WebUI UX
+
+Planned release: `4.5-webui-ux` / `versionCode=16`.
+
+- WebUI is Sortify-only: no SSH target management, no SDD config import/export, no SSH key handling.
+- Adds mode presets for normal operation, maintenance safe-hold, guard-only and explicit unsafe sorting without protected hold.
+- Adds Sortify-only config export ZIP via `action.sh --config-export`.
+- Dispatcher link remains read-only status against the SSH Drop Dispatcher marker contract.
+- Public examples stay generic (`target-alpha__*`, `targets-alpha-beta__*`, `pixel_local__*`, `termux-*`, `repo_*`).
+
+<!-- SORTIFY_DISPATCH_V45_WEBUI_UX_END -->
+
 <!-- SORTIFY_SDD_CROSS_REPO_LINK_20260601_START -->
 ## Companion: SSH Drop Dispatcher
 
@@ -30,7 +43,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.4-ssh-drop-dispatcher
+**Version:** 4.5-webui-ux
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 

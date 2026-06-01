@@ -1,6 +1,6 @@
 {
-  "version": "4.4-ssh-drop-dispatcher",
-  "versionCode": 15,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.4-ssh-drop-dispatcher/Sortify-Dispatch-v4.4-ssh-drop-dispatcher.zip",
+  "version": "4.5-webui-ux",
+  "versionCode": 16,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.5-webui-ux/Sortify-Dispatch-v4.5-webui-ux.zip",
   "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/CHANGELOG.md"
 }
