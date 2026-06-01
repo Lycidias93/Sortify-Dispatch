@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Sortify Dispatch v4.1-guard-tools - Manual Action / Guard Tools
+# Sortify Dispatch v4.5-webui-ux - Manual Action / Guard Tools
 
 ui_print() {
     echo "$1"
@@ -439,7 +439,7 @@ guard_status() {
     conflict_count="$(count_lines < "$tmp_conflicts")"
 
     echo "== Sortify Dispatch Guard Status =="
-    echo "version=4.1-guard-tools"
+    echo "version=4.5-webui-ux"
     echo "download=$DOWNLOADS"
     echo "dest_base=$DEST_BASE"
     echo "protected_in_download=$download_count"
@@ -555,6 +555,62 @@ dispatcher_status() {
     fi
 }
 
+zip_export_dir() {
+    work="$1"
+    out="$2"
+    if command -v zip >/dev/null 2>&1; then
+        (cd "$work" && zip -qr "$out" .)
+        return $?
+    fi
+    py="/data/data/com.termux/files/usr/bin/python3"
+    [ -x "$py" ] || py="/data/data/com.termux/files/usr/bin/python"
+    if [ ! -x "$py" ]; then
+        echo "config_export=failed"
+        echo "reason=missing_zip_or_python"
+        return 1
+    fi
+    (cd "$work" && "$py" -c 'import os,sys,zipfile; out=sys.argv[1]; root="."; z=zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED); [z.write(os.path.join(b,f), os.path.relpath(os.path.join(b,f), root)) for b,d,fs in os.walk(root) for f in sorted(fs)]; z.close()' "$out")
+}
+
+sortify_config_export() {
+    normalize_config
+    ensure_dirs
+    stamp="$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)"
+    work="$DEST_BASE/.sortify_config_export_$stamp"
+    out="$DOWNLOADS/Sortify-Dispatch-config-$stamp.zip"
+
+    rm -rf "$work"
+    mkdir -p "$work"
+    {
+        echo "backup_format=sortify-dispatch-config-v1"
+        echo "created_at=$stamp"
+        echo "version=4.5-webui-ux"
+        echo "includes_sdd_targets=no"
+        echo "includes_ssh_keys=no"
+        echo "includes_dispatcher_config=no"
+        echo "scope=sortify_only"
+    } > "$work/manifest.env"
+
+    [ -f "$CONF_PATH" ] && cp -f "$CONF_PATH" "$work/sortify.conf" 2>/dev/null || true
+    sortify_config_status > "$work/config-status.txt" 2>&1 || true
+    guard_status > "$work/guard-status.txt" 2>&1 || true
+    dispatcher_status > "$work/dispatcher-link-status.txt" 2>&1 || true
+    [ -f "$MODULE_DIR/module.prop" ] && grep -E '^(id=|name=|version=|versionCode=|author=|description=|updateJson=)' "$MODULE_DIR/module.prop" > "$work/module.prop.snapshot" 2>/dev/null || true
+
+    (cd "$work" && find . -type f | sort | while IFS= read -r f; do sha256sum "$f" 2>/dev/null || toybox sha256sum "$f" 2>/dev/null || true; done > SHA256SUMS)
+    rm -f "$out"
+    zip_export_dir "$work" "$out" || return $?
+    chmod 600 "$out" 2>/dev/null || true
+    rm -rf "$work"
+
+    echo "== Sortify Dispatch Config Export =="
+    echo "config_export=done"
+    echo "config_zip=$out"
+    echo "includes_sdd_targets=no"
+    echo "includes_ssh_keys=no"
+    echo "includes_dispatcher_config=no"
+}
+
 sort_now() {
     normalize_config
     ensure_dirs
@@ -602,11 +658,14 @@ case "${1:-sort}" in
     --config-status|config-status)
         sortify_config_status
         ;;
+    --config-export|config-export)
+        sortify_config_export
+        ;;
     --sort|sort|"")
         sort_now
         ;;
     *)
-        echo "Usage: action.sh [--sort|--guard-status|--guard-clean|--dispatcher-status|--config-status]"
+        echo "Usage: action.sh [--sort|--guard-status|--guard-clean|--dispatcher-status|--config-status|--config-export]"
         exit 2
         ;;
 esac
