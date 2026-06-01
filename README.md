@@ -1,3 +1,16 @@
+<!-- SORTIFY_DISPATCH_V44_SDD_START -->
+## Sortify Dispatch v4.4 - SSH Drop Dispatcher alignment
+
+Planned release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
+
+- Default dispatcher runtime is `/data/adb/ssh-drop-dispatcher`.
+- Remote protected artifacts still require the v4115 dispatcher release marker contract.
+- Pixel-local Termux artifacts stay local protected hold only.
+- `rc=0` never globally releases Pixel-local artifacts; explicit local-release marker is deferred to a later feature.
+- Visible status uses generic dispatcher keys while legacy pidd keys remain compatibility aliases.
+
+<!-- SORTIFY_DISPATCH_V44_SDD_END -->
+
 <p align="center">
   <img src="banner.png" alt="Sortify Banner" width="100%" />
 </p>

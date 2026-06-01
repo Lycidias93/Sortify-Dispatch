@@ -1,3 +1,16 @@
+<!-- SORTIFY_DISPATCH_V44_SDD_START -->
+## Sortify Dispatch v4.4 - SSH Drop Dispatcher alignment
+
+Planned release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
+
+- Default dispatcher runtime is `/data/adb/ssh-drop-dispatcher`.
+- Remote protected artifacts still require the v4115 dispatcher release marker contract.
+- Pixel-local Termux artifacts stay local protected hold only.
+- `rc=0` never globally releases Pixel-local artifacts; explicit local-release marker is deferred to a later feature.
+- Visible status uses generic dispatcher keys while legacy pidd keys remain compatibility aliases.
+
+<!-- SORTIFY_DISPATCH_V44_SDD_END -->
+
 # Artifact Guard
 
 Sortify Dispatch protects operational artifacts from extension-based sorting.
@@ -19,7 +32,7 @@ Protected files stay in `/sdcard/Download` so Dispatcher, Pixel, Termux, repo, a
 - `action.sh --guard-status` reports protected files in Download, misplaced protected files below `/sdcard/Sortify`, and conflict count.
 - `action.sh --guard-clean` safely restores misplaced protected files to `/sdcard/Download`.
 - If a same-named file already exists in Download, the misplaced file is moved to `/sdcard/Sortify/GuardConflicts/<timestamp>/` instead of overwriting.
-- `action.sh --dispatcher-status` checks whether Pixel Drop Dispatcher runtime metadata is present at `/data/adb/pixel-drop-dispatch`.
+- `action.sh --dispatcher-status` checks whether Pixel Drop Dispatcher runtime metadata is present at `/data/adb/ssh-drop-dispatcher`.
 - The KernelSU WebUI exposes interval settings, guard status, safe guard clean, dispatcher link status, and manual sort.
 
 ## Module ID and path safety
