@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V44_SDD_CHANGELOG_START -->
+## v4.4-ssh-drop-dispatcher
+
+- Align Sortify Dispatch source, status output, WebUI labels, and defaults with SSH Drop Dispatcher runtime `/data/adb/ssh-drop-dispatcher`.
+- Keep v4115 remote marker contract for `target-*__` and `targets-*__` artifacts.
+- Keep Pixel-local/Termux/repo artifacts protected locally and do not auto-release them from `rc=0`.
+- Add generic dispatcher status keys and keep legacy pidd compatibility aliases.
+
+<!-- SORTIFY_DISPATCH_V44_SDD_CHANGELOG_END -->
+
 ## 2026-05-25 - v4.3-pidd-v4115-contract
 
 - Released the PIDD v4.11.0 / policy v4115 Sortify marker contract.

@@ -13,9 +13,12 @@ GUARD_LOG="${GUARD_LOG:-1}"
 SORTIFY_DISPATCHER_INTEGRATION="${SORTIFY_DISPATCHER_INTEGRATION:-auto}"
 SORTIFY_HOLD_PROTECTED="${SORTIFY_HOLD_PROTECTED:-1}"
 SORTIFY_NORMAL_SORT="${SORTIFY_NORMAL_SORT:-1}"
-PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
-PIDD_SORTIFY_REQUIRED_POLICY="${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}"
-PIDD_SORTIFY_RELEASE_DIR="${PIDD_SORTIFY_RELEASE_DIR:-$PIDD_RUNTIME_DIR/integration/sortify-release}"
+SORTIFY_DISPATCHER_RUNTIME_DIR="${SORTIFY_DISPATCHER_RUNTIME_DIR:-${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}}"
+SORTIFY_DISPATCHER_REQUIRED_POLICY="${SORTIFY_DISPATCHER_REQUIRED_POLICY:-${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}}"
+SORTIFY_DISPATCHER_RELEASE_DIR="${SORTIFY_DISPATCHER_RELEASE_DIR:-${PIDD_SORTIFY_RELEASE_DIR:-$SORTIFY_DISPATCHER_RUNTIME_DIR/integration/sortify-release}}"
+PIDD_RUNTIME_DIR="$SORTIFY_DISPATCHER_RUNTIME_DIR"
+PIDD_SORTIFY_REQUIRED_POLICY="$SORTIFY_DISPATCHER_REQUIRED_POLICY"
+PIDD_SORTIFY_RELEASE_DIR="$SORTIFY_DISPATCHER_RELEASE_DIR"
 
 if [ -f "$CONF_PATH" ]; then
     # shellcheck disable=SC1090
@@ -39,7 +42,7 @@ normalize_config() {
         *) SORTIFY_NORMAL_SORT="1" ;;
     esac
 
-    PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
+    PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
     PIDD_SORTIFY_REQUIRED_POLICY="${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}"
     PIDD_SORTIFY_RELEASE_DIR="${PIDD_SORTIFY_RELEASE_DIR:-$PIDD_RUNTIME_DIR/integration/sortify-release}"
 }
@@ -67,9 +70,9 @@ log_guard() {
 }
 
 
-# SORTIFY_PIDD_V4110_CONTRACT_V1_START
+# SORTIFY_SDD_V4115_CONTRACT_V1_START
 dispatcher_health_ok() {
-    runtime="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
+    runtime="${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
     health="$runtime/health.env"
     [ -d "$runtime" ] || return 1
     [ -f "$health" ] || return 1
@@ -122,7 +125,7 @@ require_dispatcher_if_needed() {
     normalize_config
     if [ "$SORTIFY_DISPATCHER_INTEGRATION" = "on" ] && ! dispatcher_contract_ok; then
         ui_print "ERROR: dispatcher integration required but Pixel Drop Dispatcher runtime/marker directory is not healthy"
-        log_guard "dispatcher required but missing_or_unhealthy runtime=${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch} release_dir=${PIDD_SORTIFY_RELEASE_DIR:-}"
+        log_guard "dispatcher required but missing_or_unhealthy runtime=${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher} release_dir=${PIDD_SORTIFY_RELEASE_DIR:-}"
         return 3
     fi
     return 0
@@ -270,7 +273,7 @@ should_hold_protected_artifact() {
     log_guard "hold protected artifact file=$name integration=$state contract=$(pidd_sortify_contract_status "$file")"
     return 0
 }
-# SORTIFY_PIDD_V4110_CONTRACT_V1_END
+# SORTIFY_SDD_V4115_CONTRACT_V1_END
 
 DOC_EXT="pdf doc docx txt xls xlsx ppt pptx csv md log json yaml yml xml"
 IMG_EXT="jpg jpeg png gif bmp webp heic heif svg"
@@ -290,7 +293,7 @@ is_protected_artifact() {
         pi3_*|pi4_*|zeropi2_*|berylax_*)
             return 0
             ;;
-        pixel_local__*|pixel-termux*|pixel_termux*|termux-*|termux_*)
+        pixel_local__*|pixel-termux*|pixel_termux*|termux-*|termux_*|repo_*)
             return 0
             ;;
         pixel-drop-dispatch*|pixel_drop_dispatch*|ssh-drop-dispatcher*|ssh_drop_dispatcher*)
@@ -478,20 +481,25 @@ sortify_config_status() {
     echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"
     echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"
     echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"
-    echo "pidd_runtime_dir=$PIDD_RUNTIME_DIR"
-    echo "pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
-    echo "pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
+    echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"
+    echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"
+    echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
+    echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
     echo "sortify_contract=policy_v4115_sha_size_authority_pending"
     echo "dispatcher_integration_state=$(dispatcher_integration_state)"
-    echo "pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
-    echo "pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
+    echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
+    echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"
 }
 
 dispatcher_status() {
     normalize_config
-    runtime="${PIDD_RUNTIME_DIR:-/data/adb/pixel-drop-dispatch}"
+    runtime="${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
     config="$runtime/config.env"
-    echo "== Pixel Drop Dispatcher Link =="
+    echo "== SSH Drop Dispatcher Link =="
     echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"
     echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"
     echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"
