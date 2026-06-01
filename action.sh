@@ -168,67 +168,87 @@ marker_pending_empty() {
     [ -z "$pending" ]
 }
 
-pidd_sortify_marker_path() {
+dispatcher_sortify_marker_path() {
     file="$1"
+    normalize_config
     sha="$(file_sha256 "$file" 2>/dev/null || true)"
     [ -n "$sha" ] || return 1
     printf '%s/%s.env' "$PIDD_SORTIFY_RELEASE_DIR" "$sha"
 }
 
-pidd_sortify_contract_released() {
-    normalize_config
+pidd_sortify_marker_path() {
+    dispatcher_sortify_marker_path "$@"
+}
+
+marker_clean_value() {
+    printf '%s' "$1" | tr -d '
+' | sed "s/^[\"']//;s/[\"']$//"
+}
+
+dispatcher_sortify_contract_released() {
     file="$1"
+    normalize_config
+
     [ -f "$file" ] || return 1
     sha="$(file_sha256 "$file" 2>/dev/null || true)"
     size="$(file_size_bytes "$file" 2>/dev/null || true)"
     [ -n "$sha" ] || return 1
     [ -n "$size" ] || return 1
+
     marker="$PIDD_SORTIFY_RELEASE_DIR/$sha.env"
     [ -f "$marker" ] || return 1
 
-    released="$(marker_field "$marker" released)"
-    authority="$(marker_field "$marker" authority)"
-    marker_sha="$(marker_field "$marker" sha256)"
-    marker_size="$(marker_field "$marker" size)"
-    policy="$(marker_field "$marker" policy)"
-    pending="$(marker_field "$marker" pending_targets)"
+    released="$(marker_clean_value "$(marker_field "$marker" released)")"
+    authority="$(marker_clean_value "$(marker_field "$marker" authority)")"
+    marker_sha="$(marker_clean_value "$(marker_field "$marker" sha256)")"
+    marker_size="$(marker_clean_value "$(marker_field "$marker" size)")"
+    policy="$(marker_clean_value "$(marker_field "$marker" policy)")"
+    pending="$(marker_clean_value "$(marker_field "$marker" pending_targets)")"
 
     [ "$released" = "yes" ] || return 1
     [ "$authority" = "dispatcher" ] || return 1
     [ "$marker_sha" = "$sha" ] || return 1
     [ "$marker_size" = "$size" ] || return 1
     [ "$policy" = "$PIDD_SORTIFY_REQUIRED_POLICY" ] || return 1
-    marker_pending_empty "$pending" || return 1
+    [ -z "$pending" ] || return 1
+
     return 0
 }
 
-pidd_sortify_contract_status() {
-    normalize_config
+pidd_sortify_contract_released() {
+    dispatcher_sortify_contract_released "$@"
+}
+
+dispatcher_sortify_contract_status() {
     file="$1"
-    [ -f "$file" ] || { echo "missing_local_file"; return 0; }
+    normalize_config
+
     sha="$(file_sha256 "$file" 2>/dev/null || true)"
     size="$(file_size_bytes "$file" 2>/dev/null || true)"
     if [ -z "$sha" ]; then
         echo "held:no_sha"
         return 0
     fi
+
     marker="$PIDD_SORTIFY_RELEASE_DIR/$sha.env"
     if [ ! -f "$marker" ]; then
         echo "held:marker_missing"
         return 0
     fi
-    released="$(marker_field "$marker" released)"
-    authority="$(marker_field "$marker" authority)"
-    marker_sha="$(marker_field "$marker" sha256)"
-    marker_size="$(marker_field "$marker" size)"
-    policy="$(marker_field "$marker" policy)"
-    pending="$(marker_unquote "$(marker_field "$marker" pending_targets)")"
-    reason="$(marker_unquote "$(marker_field "$marker" reason)")"
 
-    if pidd_sortify_contract_released "$file"; then
+    released="$(marker_clean_value "$(marker_field "$marker" released)")"
+    authority="$(marker_clean_value "$(marker_field "$marker" authority)")"
+    marker_sha="$(marker_clean_value "$(marker_field "$marker" sha256)")"
+    marker_size="$(marker_clean_value "$(marker_field "$marker" size)")"
+    policy="$(marker_clean_value "$(marker_field "$marker" policy)")"
+    pending="$(marker_clean_value "$(marker_field "$marker" pending_targets)")"
+    reason="$(marker_clean_value "$(marker_field "$marker" reason)")"
+
+    if dispatcher_sortify_contract_released "$file"; then
         echo "released:policy=$policy reason=$reason"
         return 0
     fi
+
     if [ "$released" = "no" ]; then
         echo "held:released_no policy=$policy pending=$pending reason=$reason"
     elif [ "$policy" != "$PIDD_SORTIFY_REQUIRED_POLICY" ]; then
@@ -244,33 +264,41 @@ pidd_sortify_contract_status() {
     fi
 }
 
+pidd_sortify_contract_status() {
+    dispatcher_sortify_contract_status "$@"
+}
+
 should_hold_protected_artifact() {
-    name="$1"
+    file="$1"
+    name="$(basename "$file")"
+    normalize_config
+
     [ "${SORTIFY_HOLD_PROTECTED:-1}" = "1" ] || return 1
     is_protected_artifact "$name" || return 1
 
-    state="$(dispatcher_integration_state)"
-    case "$state" in
-        disabled|auto_inactive)
-            return 1
-            ;;
-        required_missing)
+    case "$name" in
+        target-pi3__*|target-pi4__*|target-zeropi2__*|target-berylax__*|targets-*__*)
+            if dispatcher_sortify_contract_released "$file" 2>/dev/null || pidd_sortify_contract_released "$file" 2>/dev/null; then
+                log_guard "release remote protected artifact file=$name contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || pidd_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"
+                return 1
+            fi
+            state="$(dispatcher_integration_state)"
+            log_guard "hold remote protected artifact file=$name integration=$state contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || pidd_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"
             return 0
             ;;
-        active)
-            ;;
-        *)
+        pixel_local__*|pixel-termux*|pixel_termux*|termux-*|termux_*|repo_*)
+            log_guard "hold local protected artifact file=$name dispatcher_marker_required=no reason=pixel_local_hold_only"
             return 0
             ;;
     esac
 
-    file="${DOWNLOADS:-/storage/emulated/0/Download}/$name"
-    if pidd_sortify_contract_released "$file"; then
-        log_guard "release protected artifact file=$name contract=$(pidd_sortify_contract_status "$file")"
+    if dispatcher_sortify_contract_released "$file" 2>/dev/null || pidd_sortify_contract_released "$file" 2>/dev/null; then
+        log_guard "release protected artifact file=$name contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || pidd_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"
         return 1
     fi
 
-    log_guard "hold protected artifact file=$name integration=$state contract=$(pidd_sortify_contract_status "$file")"
+    state="$(dispatcher_integration_state)"
+    log_guard "hold protected artifact file=$name integration=$state contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || pidd_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"
     return 0
 }
 # SORTIFY_SDD_V4115_CONTRACT_V1_END
@@ -332,7 +360,7 @@ move_one() {
         return 0
     fi
 
-    if should_hold_protected_artifact "$filename"; then
+    if should_hold_protected_artifact "$file"; then
         ui_print "KEEP artifact: $filename"
         log_guard "keep download=$DOWNLOADS file=$filename integration=$(dispatcher_integration_state)"
         return 0
