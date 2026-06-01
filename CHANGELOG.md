@@ -1,3 +1,11 @@
+<!-- SORTIFY_SDD_CROSS_REPO_LINK_CHANGELOG_20260601_START -->
+## 2026-06-01 - README cross-link to SSH Drop Dispatcher
+
+- Added a top-of-file README link from Sortify Dispatch to SSH Drop Dispatcher.
+- Updated operative README text to the `v4.4-ssh-drop-dispatcher` release and SSH Drop Dispatcher terminology.
+
+<!-- SORTIFY_SDD_CROSS_REPO_LINK_CHANGELOG_20260601_END -->
+
 <!-- SORTIFY_DISPATCH_V44_SDD_CHANGELOG_START -->
 ## v4.4-ssh-drop-dispatcher
 
