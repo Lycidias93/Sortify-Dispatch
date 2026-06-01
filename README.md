@@ -1,7 +1,18 @@
+<!-- SORTIFY_SDD_CROSS_REPO_LINK_20260601_START -->
+## Companion: SSH Drop Dispatcher
+
+Sortify Dispatch is the local sorter/protection companion for [SSH Drop Dispatcher](https://github.com/Lycidias93/ssh-drop-dispatcher).
+
+- SSH Drop Dispatcher owns target delivery and writes authoritative `policy=v4115` release markers.
+- Sortify Dispatch keeps `target-*__*` and `targets-*__*` artifacts in `/sdcard/Download` until that marker is valid.
+- Pixel-local, Termux and repo helper artifacts stay local protected hold; `rc=0` is not an automatic release signal.
+
+<!-- SORTIFY_SDD_CROSS_REPO_LINK_20260601_END -->
+
 <!-- SORTIFY_DISPATCH_V44_SDD_START -->
 ## Sortify Dispatch v4.4 - SSH Drop Dispatcher alignment
 
-Planned release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
+Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 - Default dispatcher runtime is `/data/adb/ssh-drop-dispatcher`.
 - Remote protected artifacts still require the v4115 dispatcher release marker contract.
@@ -19,9 +30,9 @@ Planned release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.2-optional-dispatcher
+**Version:** 4.4-ssh-drop-dispatcher
 
-Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for Pixel Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
+Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
 ## What stays in Download
 
@@ -50,7 +61,7 @@ su -c sh /data/adb/modules/sortify/action.sh --dispatcher-status
 
 ## Dispatcher link
 
-Sortify Dispatch does not control Pixel Drop Dispatcher. It only provides read-only dispatcher link status and protects dispatcher-related artifacts from being sorted away.
+Sortify Dispatch does not control SSH Drop Dispatcher. It only provides read-only dispatcher link status and protects dispatcher-related artifacts from being sorted away.
 
 
 ## Hold / release contract
@@ -59,7 +70,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-v4.2-optional-dispatcher.zip` from Releases.
+1. Download `Sortify-Dispatch-v4.4-ssh-drop-dispatcher.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.
