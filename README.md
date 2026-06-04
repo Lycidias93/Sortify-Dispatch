@@ -1,3 +1,22 @@
+<!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_START -->
+## Sortify Dispatch 4.5.1-custom-park-prefixes
+
+Sortify Dispatch `4.5.1-custom-park-prefixes` adds configurable **custom park prefixes** for local hold-only files.
+
+Highlights:
+- WebUI field for custom park prefixes such as `mypark__`, `hold__`, `nosort__` or `skoda__`.
+- Custom prefixes are local hold only; they never create SSH targets and never release files through the SSH Drop Dispatcher.
+- `action.sh --test-filename <name>` shows whether a filename is held by a custom prefix or built-in rule.
+- `action.sh --guard-status` is bounded by `SORTIFY_GUARD_MAX_FILES` and `SORTIFY_GUARD_STATUS_TIMEOUT`.
+- Config export remains Sortify-only and includes custom park prefixes plus guard bounds.
+
+Out of scope:
+- No SDD target creation/editing.
+- No SDD config import/export.
+- No SSH key handling.
+- No private runtime migration.
+<!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_END -->
+
 <!-- SORTIFY_DISPATCH_V45_WEBUI_UX_START -->
 ## Sortify Dispatch v4.5 - WebUI UX
 

@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_CHANGELOG_START -->
+## 2026-06-01 - Sortify Dispatch 4.5.1-custom-park-prefixes
+
+- Add configurable custom park prefixes for local hold-only artifacts.
+- Add WebUI editor for custom prefixes, guard bounds and filename testing.
+- Bound `--guard-status` with configurable max-file and timeout settings.
+- Keep SDD link status read-only; no SDD target/config/SSH-key handling.
+- Keep config export Sortify-only while including custom prefix and guard-bound keys.
+<!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_CHANGELOG_END -->
+
 <!-- SORTIFY_DISPATCH_V45_WEBUI_UX_START -->
 ## 4.5-webui-ux
 
