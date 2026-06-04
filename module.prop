@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.5-webui-ux
-versionCode=16
+version=4.5.1-custom-park-prefixes
+versionCode=17
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch v4.5 WebUI UX with Sortify-only mode presets, config export ZIP, protected artifact guidance, v4115 SDD marker read-only status, local Pixel/Termux hold, and guard tools.
+description=Sortify Dispatch v4.5.1 with configurable custom park prefixes, bounded guard status, filename tester, Sortify-only config export, v4115 SDD marker read-only status, local Pixel/Termux hold, and guard tools.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Sortify Dispatch v4.5-webui-ux - Manual Action / Guard Tools
+# Sortify Dispatch v4.5.1-custom-park-prefixes - Manual Action / Guard Tools
 
 ui_print() {
     echo "$1"
@@ -13,6 +13,9 @@ GUARD_LOG="${GUARD_LOG:-1}"
 SORTIFY_DISPATCHER_INTEGRATION="${SORTIFY_DISPATCHER_INTEGRATION:-auto}"
 SORTIFY_HOLD_PROTECTED="${SORTIFY_HOLD_PROTECTED:-1}"
 SORTIFY_NORMAL_SORT="${SORTIFY_NORMAL_SORT:-1}"
+SORTIFY_CUSTOM_PARK_PREFIXES="${SORTIFY_CUSTOM_PARK_PREFIXES:-}"
+SORTIFY_GUARD_MAX_FILES="${SORTIFY_GUARD_MAX_FILES:-300}"
+SORTIFY_GUARD_STATUS_TIMEOUT="${SORTIFY_GUARD_STATUS_TIMEOUT:-8}"
 SORTIFY_DISPATCHER_RUNTIME_DIR="${SORTIFY_DISPATCHER_RUNTIME_DIR:-${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}}"
 SORTIFY_DISPATCHER_REQUIRED_POLICY="${SORTIFY_DISPATCHER_REQUIRED_POLICY:-${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}}"
 SORTIFY_DISPATCHER_RELEASE_DIR="${SORTIFY_DISPATCHER_RELEASE_DIR:-${PIDD_SORTIFY_RELEASE_DIR:-$SORTIFY_DISPATCHER_RUNTIME_DIR/integration/sortify-release}}"
@@ -42,6 +45,18 @@ normalize_config() {
         *) SORTIFY_NORMAL_SORT="1" ;;
     esac
 
+    case "${SORTIFY_GUARD_MAX_FILES:-300}" in
+        ""|*[!0-9]*) SORTIFY_GUARD_MAX_FILES="300" ;;
+    esac
+    [ "$SORTIFY_GUARD_MAX_FILES" -lt 1 ] 2>/dev/null && SORTIFY_GUARD_MAX_FILES="300"
+    [ "$SORTIFY_GUARD_MAX_FILES" -gt 2000 ] 2>/dev/null && SORTIFY_GUARD_MAX_FILES="2000"
+
+    case "${SORTIFY_GUARD_STATUS_TIMEOUT:-8}" in
+        ""|*[!0-9]*) SORTIFY_GUARD_STATUS_TIMEOUT="8" ;;
+    esac
+    [ "$SORTIFY_GUARD_STATUS_TIMEOUT" -lt 2 ] 2>/dev/null && SORTIFY_GUARD_STATUS_TIMEOUT="8"
+    [ "$SORTIFY_GUARD_STATUS_TIMEOUT" -gt 60 ] 2>/dev/null && SORTIFY_GUARD_STATUS_TIMEOUT="60"
+
     PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
     PIDD_SORTIFY_REQUIRED_POLICY="${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}"
     PIDD_SORTIFY_RELEASE_DIR="${PIDD_SORTIFY_RELEASE_DIR:-$PIDD_RUNTIME_DIR/integration/sortify-release}"
@@ -69,6 +84,89 @@ log_guard() {
     echo "[Guard] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$DEST_BASE/guard.log"
 }
 
+
+
+# SORTIFY_CUSTOM_PARK_PREFIXES_V1_START
+custom_prefix_sanitize_one() {
+    raw="$1"
+    clean="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    case "$clean" in
+        ""|target-*|targets-*|*[!a-z0-9_.-]*) return 1 ;;
+    esac
+    case "$clean" in ???*) ;; *) return 1 ;; esac
+    printf '%s' "$clean"
+}
+
+custom_prefixes_csv() {
+    old_ifs="$IFS"
+    IFS=","
+    first=1
+    seen=""
+    for raw in ${SORTIFY_CUSTOM_PARK_PREFIXES:-}; do
+        clean="$(custom_prefix_sanitize_one "$raw" 2>/dev/null || true)"
+        [ -n "$clean" ] || continue
+        case ",$seen," in *",$clean,"*) continue ;; esac
+        seen="${seen:+$seen,}$clean"
+        if [ "$first" = "1" ]; then printf '%s' "$clean"; first=0; else printf ',%s' "$clean"; fi
+    done
+    IFS="$old_ifs"
+}
+
+custom_park_match_prefix() {
+    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    prefixes="$(custom_prefixes_csv)"
+    old_ifs="$IFS"
+    IFS=","
+    for prefix in $prefixes; do
+        [ -n "$prefix" ] || continue
+        case "$name" in "$prefix"*) IFS="$old_ifs"; printf '%s' "$prefix"; return 0 ;; esac
+    done
+    IFS="$old_ifs"
+    return 1
+}
+
+is_custom_park_artifact() {
+    [ -n "$(custom_park_match_prefix "$1" 2>/dev/null || true)" ]
+}
+
+custom_prefixes_status() {
+    normalize_config
+    echo "== Sortify Dispatch Custom Park Prefixes =="
+    echo "custom_park_prefixes=$(custom_prefixes_csv)"
+    echo "guard_max_files=$SORTIFY_GUARD_MAX_FILES"
+    echo "guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"
+    echo "custom_prefix_scope=local_hold_only"
+    echo "dispatcher_marker_required=no"
+    echo "sdd_targets_managed=no"
+}
+
+test_filename_status() {
+    normalize_config
+    name="$(basename "${1:-}")"
+    if [ -z "$name" ]; then echo "test_filename=missing"; return 2; fi
+    prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"
+    echo "== Sortify Dispatch Filename Test =="
+    echo "filename=$name"
+    if [ -n "$prefix" ]; then
+        echo "local_hold=yes"
+        echo "reason=custom_prefix:$prefix"
+        echo "dispatcher_marker_required=no"
+        echo "would_sort=no"
+        return 0
+    fi
+    if is_protected_artifact "$name"; then
+        echo "local_hold=yes"
+        echo "reason=builtin_protected_pattern"
+        echo "dispatcher_marker_required=maybe_for_remote_target"
+        echo "would_sort=no_without_valid_marker"
+        return 0
+    fi
+    echo "local_hold=no"
+    echo "reason=no_protected_pattern"
+    echo "dispatcher_marker_required=no"
+    echo "would_sort=yes_if_normal_sort_enabled"
+}
+# SORTIFY_CUSTOM_PARK_PREFIXES_V1_END
 
 # SORTIFY_SDD_V4115_CONTRACT_V1_START
 dispatcher_health_ok() {
@@ -274,6 +372,11 @@ should_hold_protected_artifact() {
     normalize_config
 
     [ "${SORTIFY_HOLD_PROTECTED:-1}" = "1" ] || return 1
+    if is_custom_park_artifact "$name"; then
+        prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"
+        log_guard "hold custom parked artifact file=$name prefix=$prefix dispatcher_marker_required=no reason=custom_park_prefix"
+        return 0
+    fi
     is_protected_artifact "$name" || return 1
 
     case "$name" in
@@ -313,6 +416,10 @@ APP_EXT="apk exe apks apkm xapk"
 is_protected_artifact() {
     name="$1"
     lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+
+    if is_custom_park_artifact "$lower"; then
+        return 0
+    fi
 
     case "$lower" in
         target-pi3__*|target-pi4__*|target-zeropi2__*|target-berylax__*|targets-*__*)
@@ -395,12 +502,15 @@ move_files() {
 find_protected_under() {
     dir="$1"
     [ -d "$dir" ] || return 0
-    find "$dir" -maxdepth 1 -type f -print | while IFS= read -r file; do
+    normalize_config
+    limit="${SORTIFY_GUARD_MAX_FILES:-300}"
+    find "$dir" -maxdepth 1 -type f -print 2>/dev/null | while IFS= read -r file; do
         name="$(basename "$file")"
         if is_protected_artifact "$name"; then
-            printf '%s\n' "$file"
+            printf '%s
+' "$file"
         fi
-    done
+    done | sed -n "1,${limit}p"
 }
 
 find_misplaced_protected() {
@@ -421,7 +531,7 @@ count_lines() {
     wc -l | tr -d ' '
 }
 
-guard_status() {
+guard_status_raw() {
     ensure_dirs
     tmp_misplaced="$DEST_BASE/.guard_misplaced.$$"
     tmp_download="$DEST_BASE/.guard_download.$$"
@@ -439,7 +549,7 @@ guard_status() {
     conflict_count="$(count_lines < "$tmp_conflicts")"
 
     echo "== Sortify Dispatch Guard Status =="
-    echo "version=4.5-webui-ux"
+    echo "version=4.5.1-custom-park-prefixes"
     echo "download=$DOWNLOADS"
     echo "dest_base=$DEST_BASE"
     echo "protected_in_download=$download_count"
@@ -455,6 +565,38 @@ guard_status() {
     fi
 
     rm -f "$tmp_misplaced" "$tmp_download" "$tmp_conflicts"
+}
+
+
+guard_status() {
+    normalize_config
+    if [ "${SORTIFY_GUARD_STATUS_INNER:-0}" != "1" ]; then
+        if command -v timeout >/dev/null 2>&1; then
+            SORTIFY_GUARD_STATUS_INNER=1 timeout "$SORTIFY_GUARD_STATUS_TIMEOUT" sh "$0" --guard-status-raw
+            rc=$?
+            if [ "$rc" = "124" ]; then
+                echo "== Sortify Dispatch Guard Status =="
+                echo "guard_status=timeout"
+                echo "timeout_seconds=$SORTIFY_GUARD_STATUS_TIMEOUT"
+                echo "guard_max_files=$SORTIFY_GUARD_MAX_FILES"
+                return 124
+            fi
+            return "$rc"
+        fi
+        if command -v toybox >/dev/null 2>&1 && toybox --list 2>/dev/null | grep -qx timeout; then
+            SORTIFY_GUARD_STATUS_INNER=1 toybox timeout "$SORTIFY_GUARD_STATUS_TIMEOUT" sh "$0" --guard-status-raw
+            rc=$?
+            if [ "$rc" = "124" ]; then
+                echo "== Sortify Dispatch Guard Status =="
+                echo "guard_status=timeout"
+                echo "timeout_seconds=$SORTIFY_GUARD_STATUS_TIMEOUT"
+                echo "guard_max_files=$SORTIFY_GUARD_MAX_FILES"
+                return 124
+            fi
+            return "$rc"
+        fi
+    fi
+    guard_status_raw
 }
 
 guard_clean() {
@@ -509,6 +651,9 @@ sortify_config_status() {
     echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"
     echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"
     echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"
+    echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"
+    echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"
+    echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"
     echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"
     echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"
     echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"
@@ -584,11 +729,13 @@ sortify_config_export() {
     {
         echo "backup_format=sortify-dispatch-config-v1"
         echo "created_at=$stamp"
-        echo "version=4.5-webui-ux"
+        echo "version=4.5.1-custom-park-prefixes"
         echo "includes_sdd_targets=no"
         echo "includes_ssh_keys=no"
         echo "includes_dispatcher_config=no"
         echo "scope=sortify_only"
+        echo "includes_custom_park_prefixes=yes"
+        echo "includes_guard_bounds=yes"
     } > "$work/manifest.env"
 
     [ -f "$CONF_PATH" ] && cp -f "$CONF_PATH" "$work/sortify.conf" 2>/dev/null || true
@@ -649,6 +796,9 @@ case "${1:-sort}" in
     --guard-status|--guard-verify|guard-status|guard-verify)
         guard_status
         ;;
+    --guard-status-raw|guard-status-raw)
+        guard_status_raw
+        ;;
     --guard-clean|guard-clean)
         guard_clean
         ;;
@@ -658,6 +808,12 @@ case "${1:-sort}" in
     --config-status|config-status)
         sortify_config_status
         ;;
+    --custom-prefixes-status|custom-prefixes-status)
+        custom_prefixes_status
+        ;;
+    --test-filename|test-filename)
+        test_filename_status "${2:-}"
+        ;;
     --config-export|config-export)
         sortify_config_export
         ;;
@@ -665,7 +821,7 @@ case "${1:-sort}" in
         sort_now
         ;;
     *)
-        echo "Usage: action.sh [--sort|--guard-status|--guard-clean|--dispatcher-status|--config-status|--config-export]"
+        echo "Usage: action.sh [--sort|--guard-status|--guard-status-raw|--guard-clean|--dispatcher-status|--config-status|--custom-prefixes-status|--test-filename NAME|--config-export]"
         exit 2
         ;;
 esac
