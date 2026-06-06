@@ -106,3 +106,10 @@
 - Kept default dispatcher integration as `auto` to avoid breaking users without Pixel Drop Dispatcher.
 - Replaced WebUI config write heredoc with a quoted `printf` write path.
 <!-- SORTIFY_OPTIONAL_DISPATCHER_IMPLEMENTED_20260517_END -->
+
+## 4.6-smart-dedupe - 2026-06-05
+
+- Added smart categories for ebooks, code, config, data, fonts, certificates, backups and torrents.
+- Added optional checksum duplicate handling with safe deletion only on matching SHA-256.
+- Added WebUI controls for duplicate mode, guard temp cleanup and log rotation.
+- Kept SDD target/SSH management read-only/out-of-scope.

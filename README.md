@@ -216,3 +216,9 @@ Modes:
 - `auto`: use the contract only when PIDD runtime and marker directory are healthy.
 - `on`: require a healthy PIDD runtime and marker directory; otherwise sorting fails clearly.
 <!-- SORTIFY_PIDD_V4110_CONTRACT_20260525_END -->
+
+<!-- SORTIFY_V46_SMART_DEDUPE_START -->
+## 4.6-smart-dedupe
+
+Sortify Dispatch 4.6-smart-dedupe adds extended categories and optional SHA-256 duplicate handling. With `SORTIFY_DUPLICATE_MODE=checksum_delete_identical`, identical same-name duplicates are deleted after matching SHA-256; same-name files with different checksums are kept in `Duplicates` with collision-safe names. Custom Park Prefixes remain local-hold-only and SDD target/SSH management remains out of scope.
+<!-- SORTIFY_V46_SMART_DEDUPE_END -->
