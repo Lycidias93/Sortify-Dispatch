@@ -26,7 +26,9 @@ set_perm_recursive "$MODPATH" 0 0 0755 0644
 # B. Override Scripts: Make them executable (755)
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/action.sh" 0 0 0755
-set_perm "$MODPATH/uninstall.sh" 0 0 0755
+if [ -f "$MODPATH/uninstall.sh" ]; then
+    set_perm "$MODPATH/uninstall.sh" 0 0 0755
+fi
 
 # C. Config File: Ensure writable
 if [ -f "$MODPATH/sortify.conf" ]; then

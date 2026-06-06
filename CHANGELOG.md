@@ -1,3 +1,9 @@
+## 4.6.1-install-ui-hotfix
+
+- Fix update/install dialog changelog source to use raw Markdown instead of GitHub HTML release page.
+- Guard optional `uninstall.sh` permission handling during install.
+- No runtime behavior change to smart categories, checksum duplicate handling, SDD marker contract, DNS/HA/VIP/route, or host drop paths.
+
 <!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_CHANGELOG_START -->
 ## 2026-06-01 - Sortify Dispatch 4.5.1-custom-park-prefixes
 

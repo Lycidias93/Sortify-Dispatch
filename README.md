@@ -1,4 +1,11 @@
 <!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_START -->
+### 4.6.1-install-ui-hotfix install UI hotfix
+
+- Update metadata changelog uses plain raw Markdown so Magisk/KernelSU dialogs do not display GitHub HTML.
+- `customize.sh` ignores missing optional `uninstall.sh` during permission setup.
+- No change to SDD targets, SSH keys, DNS/HA/VIP/route, or host drop paths.
+
+
 ## Sortify Dispatch 4.5.1-custom-park-prefixes
 
 Sortify Dispatch `4.5.1-custom-park-prefixes` adds configurable **custom park prefixes** for local hold-only files.

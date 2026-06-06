@@ -1,6 +1,6 @@
 {
-  "version": "4.6-smart-dedupe",
-  "versionCode": 18,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.6-smart-dedupe/Sortify-Dispatch-v4.6-smart-dedupe.zip",
-  "changelog": "https://github.com/Lycidias93/Sortify-Dispatch/releases/tag/v4.6-smart-dedupe"
+  "version": "4.6.1-install-ui-hotfix",
+  "versionCode": 19,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.6.1-install-ui-hotfix/Sortify-Dispatch-v4.6.1-install-ui-hotfix.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.6.1-install-ui-hotfix.md"
 }
