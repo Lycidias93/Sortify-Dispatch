@@ -119,3 +119,14 @@
 - Added optional checksum duplicate handling with safe deletion only on matching SHA-256.
 - Added WebUI controls for duplicate mode, guard temp cleanup and log rotation.
 - Kept SDD target/SSH management read-only/out-of-scope.
+
+<!-- SORTIFY_V462_CONFIG_PRESERVE_20260606_START -->
+## 4.6.2-config-preserve - 2026-06-06
+
+- Preserves existing Sortify config during Magisk upgrades.
+- Keeps custom park prefixes, duplicate handling mode, guard bounds, log rotation and dispatcher integration settings.
+- Keeps v4.6 smart categories and checksum duplicate handling behavior unchanged.
+- Keeps update changelog raw Markdown/plain text.
+
+Risk: low for release metadata/config preservation; no SDD, SSH, DNS, HA, VIP, route or host drop path changes.
+<!-- SORTIFY_V462_CONFIG_PRESERVE_20260606_END -->
