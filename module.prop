@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.6.1-install-ui-hotfix
-versionCode=19
+version=4.6.2-config-preserve
+versionCode=20
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch v4.6.1 install UI hotfix: plain-text update changelog, guarded uninstall permission, smart categories, checksum duplicate handling, guard cleanup and log rotation.
+description=Sortify Dispatch v4.6.2 config preserve: keeps existing Sortify settings across Magisk upgrades, including custom park prefixes, duplicate mode, guard bounds, log rotation and dispatcher mode.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png

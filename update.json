@@ -1,6 +1,6 @@
 {
-  "version": "4.6.1-install-ui-hotfix",
-  "versionCode": 19,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.6.1-install-ui-hotfix/Sortify-Dispatch-v4.6.1-install-ui-hotfix.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.6.1-install-ui-hotfix.md"
+  "version": "4.6.2-config-preserve",
+  "versionCode": 20,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.6.2-config-preserve/Sortify-Dispatch-v4.6.2-config-preserve.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.6.2-config-preserve.md"
 }

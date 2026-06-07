@@ -229,3 +229,11 @@ Modes:
 
 Sortify Dispatch 4.6-smart-dedupe adds extended categories and optional SHA-256 duplicate handling. With `SORTIFY_DUPLICATE_MODE=checksum_delete_identical`, identical same-name duplicates are deleted after matching SHA-256; same-name files with different checksums are kept in `Duplicates` with collision-safe names. Custom Park Prefixes remain local-hold-only and SDD target/SSH management remains out of scope.
 <!-- SORTIFY_V46_SMART_DEDUPE_END -->
+
+<!-- SORTIFY_V462_CONFIG_PRESERVE_20260606_START -->
+## v4.6.2 config preserve
+
+`4.6.2-config-preserve` preserves existing Sortify settings during Magisk upgrades, including custom park prefixes, duplicate handling mode, guard bounds, log rotation and dispatcher mode.
+
+Default duplicate mode remains `filename`; checksum-based deletion of identical source duplicates remains opt-in.
+<!-- SORTIFY_V462_CONFIG_PRESERVE_20260606_END -->
