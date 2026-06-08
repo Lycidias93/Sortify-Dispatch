@@ -237,3 +237,7 @@ Sortify Dispatch 4.6-smart-dedupe adds extended categories and optional SHA-256 
 
 Default duplicate mode remains `filename`; checksum-based deletion of identical source duplicates remains opt-in.
 <!-- SORTIFY_V462_CONFIG_PRESERVE_20260606_END -->
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE).
