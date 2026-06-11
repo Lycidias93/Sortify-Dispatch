@@ -1,3 +1,25 @@
+<!-- SORTIFY_DISPATCH_V463_MARKDOWN_HANDOVER_HOLD_START -->
+## Sortify Dispatch v4.6.3 - Markdown/Handover local-hold
+
+Release: `4.6.3-markdown-handover-hold` / `versionCode=21`.
+
+What changed:
+- Markdown/Handover operational files stay in `/sdcard/Download`:
+  - `*handover*.md`
+  - `README*.md`
+  - `RELEASE_NOTES*.md`
+- The rule is local-hold-only and never creates an SSH Drop Dispatcher release.
+- Custom prefix `heimnetz__` remains supported for explicit Heimnetz local-hold files.
+- `target-*__*` and `targets-*__*` remain the only dispatcher remote-target schemas.
+- `action.sh --test-filename <name>` reports `reason=markdown_handover_hold` for these files.
+
+Out of scope:
+- No SDD target management.
+- No SSH key handling.
+- No DNS/HA/VIP/route or host-drop changes.
+- No default change to `checksum_delete_identical`.
+<!-- SORTIFY_DISPATCH_V463_MARKDOWN_HANDOVER_HOLD_END -->
+
 <!-- SORTIFY_DISPATCH_V451_CUSTOM_PARK_PREFIXES_START -->
 ### 4.6.1-install-ui-hotfix install UI hotfix
 
@@ -69,7 +91,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.5-webui-ux
+**Version:** 4.6.3-markdown-handover-hold
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -84,6 +106,7 @@ The Artifact Guard keeps these operational artifacts in `/sdcard/Download`:
 - Termux helper artifacts: `termux-*`, `termux_*`, `pixel-termux*`, `pixel_termux*`
 - dispatcher release artifacts: `pixel-drop-dispatch*`, `pixel_drop_dispatch*`, `ssh-drop-dispatcher*`, `ssh_drop_dispatcher*`, `*drop-dispatch*`, `*drop_dispatch*`
 - Sortify Dispatch release artifacts: `sortify-dispatch*`, `sortify_dispatch*`
+- Markdown/Handover files: `*handover*.md`, `README*.md`, `RELEASE_NOTES*.md`
 - repo helper scripts: `repo_*.py`, `*_repo_*.py`, `repo_*.sh`, `*_repo_*.sh`
 
 Normal documents, images, videos, audio files, archives, APKs, and other files are still sorted into `/sdcard/Sortify`.

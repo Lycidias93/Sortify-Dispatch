@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.6.2-config-preserve
-versionCode=20
+version=4.6.3-markdown-handover-hold
+versionCode=21
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch v4.6.2 config preserve: keeps existing Sortify settings across Magisk upgrades, including custom park prefixes, duplicate mode, guard bounds, log rotation and dispatcher mode.
+description=Sortify Dispatch v4.6.3: keeps Markdown/Handover release notes local-hold, preserves config, and keeps SSH Drop Dispatcher link read-only.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png

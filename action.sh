@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Sortify Dispatch v4.6-smart-dedupe - Manual Action / Guard Tools
+# Sortify Dispatch v4.6.3-markdown-handover-hold - Manual Action / Guard Tools
 
 ui_print() {
     echo "$1"
@@ -131,6 +131,14 @@ custom_park_match_prefix() {
 
 is_custom_park_artifact() { [ -n "$(custom_park_match_prefix "$1" 2>/dev/null || true)" ]; }
 
+is_markdown_handover_artifact() {
+    name="$1"; lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        *handover*.md|readme*.md|release_notes*.md) return 0 ;;
+    esac
+    return 1
+}
+
 file_sha256() {
     file="$1"
     if command -v sha256sum >/dev/null 2>&1; then
@@ -219,6 +227,7 @@ pidd_sortify_contract_status() { dispatcher_sortify_contract_status "$@"; }
 is_protected_artifact() {
     name="$1"; lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
     if is_custom_park_artifact "$lower"; then return 0; fi
+    if is_markdown_handover_artifact "$lower"; then return 0; fi
     case "$lower" in
         target-pi3__*|target-pi4__*|target-zeropi2__*|target-berylax__*|targets-*__*) return 0 ;;
         pi3_*|pi4_*|zeropi2_*|berylax_*) return 0 ;;
@@ -237,6 +246,7 @@ should_hold_protected_artifact() {
     is_protected_artifact "$name" || return 1
     prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"
     if [ -n "$prefix" ]; then log_guard "hold custom park artifact file=$name prefix=$prefix dispatcher_marker_required=no"; return 0; fi
+    if is_markdown_handover_artifact "$name"; then log_guard "hold markdown/handover artifact file=$name dispatcher_marker_required=no reason=markdown_handover_hold"; return 0; fi
     case "$name" in
         target-pi3__*|target-pi4__*|target-zeropi2__*|target-berylax__*|targets-*__*)
             if dispatcher_sortify_contract_released "$file" 2>/dev/null || pidd_sortify_contract_released "$file" 2>/dev/null; then
@@ -340,7 +350,7 @@ guard_status_raw() {
     find_misplaced_protected > "$tmp_misplaced" || true
     find_protected_under "$DEST_BASE/GuardConflicts" > "$tmp_conflicts" || true
     download_count="$(count_lines < "$tmp_download")"; misplaced_count="$(count_lines < "$tmp_misplaced")"; conflict_count="$(count_lines < "$tmp_conflicts")"
-    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6-smart-dedupe"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
+    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6.3-markdown-handover-hold"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
     if [ "$misplaced_count" = "0" ]; then echo "guard_status=pass"; else echo "guard_status=needs_clean"; echo "-- misplaced --"; cat "$tmp_misplaced"; fi
     rm -f "$tmp_misplaced" "$tmp_download" "$tmp_conflicts"
 }
@@ -388,6 +398,7 @@ test_filename_status() {
     normalize_config; name="$(basename "${1:-}")"; [ -n "$name" ] || { echo "test_filename=missing"; return 2; }
     prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"; echo "== Sortify Dispatch Filename Test =="; echo "filename=$name"
     if [ -n "$prefix" ]; then echo "local_hold=yes"; echo "reason=custom_prefix:$prefix"; echo "dispatcher_marker_required=no"; echo "would_sort=no"; return 0; fi
+    if is_markdown_handover_artifact "$name"; then echo "local_hold=yes"; echo "reason=markdown_handover_hold"; echo "dispatcher_marker_required=no"; echo "would_sort=no"; return 0; fi
     if is_protected_artifact "$name"; then echo "local_hold=yes"; echo "reason=builtin_protected_pattern"; echo "dispatcher_marker_required=maybe_for_remote_target"; echo "would_sort=no_without_valid_marker"; return 0; fi
     echo "local_hold=no"; echo "reason=no_protected_pattern"; echo "dispatcher_marker_required=no"; echo "would_sort=yes_if_normal_sort_enabled"
 }
@@ -410,7 +421,7 @@ zip_export_dir() {
 sortify_config_export() {
     normalize_config; ensure_dirs; stamp="$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)"; work="$DEST_BASE/.sortify_config_export_$stamp"; out="$DOWNLOADS/Sortify-Dispatch-config-$stamp.zip"
     rm -rf "$work"; mkdir -p "$work"
-    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6-smart-dedupe"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
+    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6.3-markdown-handover-hold"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
     [ -f "$CONF_PATH" ] && cp -f "$CONF_PATH" "$work/sortify.conf" 2>/dev/null || true
     sortify_config_status > "$work/config-status.txt" 2>&1 || true; duplicate_status > "$work/duplicate-status.txt" 2>&1 || true; guard_status > "$work/guard-status.txt" 2>&1 || true; dispatcher_status > "$work/dispatcher-link-status.txt" 2>&1 || true
     [ -f "$MODULE_DIR/module.prop" ] && grep -E '^(id=|name=|version=|versionCode=|author=|description=|updateJson=)' "$MODULE_DIR/module.prop" > "$work/module.prop.snapshot" 2>/dev/null || true
