@@ -1,3 +1,27 @@
+<!-- SORTIFY_DISPATCH_V464_STATE_CONTRACT_PREVIEW_START -->
+## Sortify Dispatch v4.6.4 - State Contract Preview
+
+Release: `4.6.4-state-contract-preview` / `versionCode=22`.
+
+This release adds read-only operator inspection for the existing SSH Drop Dispatcher contract.
+
+New CLI actions:
+
+```sh
+su -c sh /data/adb/modules/sortify/action.sh --explain-route <filename-or-path>
+su -c sh /data/adb/modules/sortify/action.sh --marker-status <filename-or-path>
+su -c sh /data/adb/modules/sortify/action.sh --contract-smoke
+```
+
+Scope:
+
+- `--explain-route` classifies local-hold, Markdown/Handover, Pixel-local and remote target artifacts.
+- `--marker-status` reads the existing dispatcher marker root and reports `released`, `authority`, `policy`, target fields and final gate.
+- `--contract-smoke` verifies Sortify-side expectations for `policy=v4115`, local holds, remote target holds and normal sortable files.
+- SDD marker root remains read-only from Sortify.
+- No SDD target management, no SSH key handling, no ntfy secret handling, no host run, no DNS/HA/VIP/route changes.
+<!-- SORTIFY_DISPATCH_V464_STATE_CONTRACT_PREVIEW_END -->
+
 <!-- SORTIFY_DISPATCH_V463_MARKDOWN_HANDOVER_HOLD_START -->
 ## Sortify Dispatch v4.6.3 - Markdown/Handover local-hold
 
@@ -91,7 +115,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.6.3-markdown-handover-hold
+**Version:** 4.6.4-state-contract-preview
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 

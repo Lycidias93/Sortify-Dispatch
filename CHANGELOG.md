@@ -1,3 +1,14 @@
+<!-- CHANGELOG_SORTIFY_DISPATCH_V464_STATE_CONTRACT_PREVIEW_START -->
+## 4.6.4-state-contract-preview - State Contract Preview
+
+- Added read-only `--explain-route <filename-or-path>`.
+- Added read-only `--marker-status <filename-or-path>`.
+- Added read-only `--contract-smoke`.
+- Kept Sortify/SDD policy contract at `v4115`.
+- Kept SDD marker root read-only from Sortify.
+- No SDD target management, SSH key handling, host-run, DNS/HA/VIP/route or host-drop changes.
+<!-- CHANGELOG_SORTIFY_DISPATCH_V464_STATE_CONTRACT_PREVIEW_END -->
+
 ## 4.6.1-install-ui-hotfix
 
 - Fix update/install dialog changelog source to use raw Markdown instead of GitHub HTML release page.

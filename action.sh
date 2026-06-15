@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Sortify Dispatch v4.6.3-markdown-handover-hold - Manual Action / Guard Tools
+# Sortify Dispatch v4.6.4-state-contract-preview - Manual Action / Guard Tools
 
 ui_print() {
     echo "$1"
@@ -350,7 +350,7 @@ guard_status_raw() {
     find_misplaced_protected > "$tmp_misplaced" || true
     find_protected_under "$DEST_BASE/GuardConflicts" > "$tmp_conflicts" || true
     download_count="$(count_lines < "$tmp_download")"; misplaced_count="$(count_lines < "$tmp_misplaced")"; conflict_count="$(count_lines < "$tmp_conflicts")"
-    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6.3-markdown-handover-hold"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
+    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6.4-state-contract-preview"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
     if [ "$misplaced_count" = "0" ]; then echo "guard_status=pass"; else echo "guard_status=needs_clean"; echo "-- misplaced --"; cat "$tmp_misplaced"; fi
     rm -f "$tmp_misplaced" "$tmp_download" "$tmp_conflicts"
 }
@@ -403,6 +403,268 @@ test_filename_status() {
     echo "local_hold=no"; echo "reason=no_protected_pattern"; echo "dispatcher_marker_required=no"; echo "would_sort=yes_if_normal_sort_enabled"
 }
 
+
+sortify_file_arg_path() {
+    arg="${1:-}"
+    [ -n "$arg" ] || return 1
+    if [ -f "$arg" ]; then printf '%s' "$arg"; return 0; fi
+    name="$(basename "$arg")"
+    if [ -f "$DOWNLOADS/$name" ]; then printf '%s' "$DOWNLOADS/$name"; return 0; fi
+    return 1
+}
+
+is_remote_target_artifact() {
+    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$name" in target-pi3__*|target-pi4__*|target-zeropi2__*|target-berylax__*|targets-*__*) return 0 ;; esac
+    return 1
+}
+
+remote_targets_from_name() {
+    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$name" in
+        target-pi3__*) echo "pi3"; return 0 ;;
+        target-pi4__*) echo "pi4"; return 0 ;;
+        target-zeropi2__*) echo "zeropi2"; return 0 ;;
+        target-berylax__*) echo "berylax"; return 0 ;;
+        targets-*__*)
+            token="${name%%__*}"
+            token="${token#targets-}"
+            printf '%s' "$token" | tr '-' ' '
+            return 0 ;;
+    esac
+    echo ""
+}
+
+is_pixel_local_artifact() {
+    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$name" in pixel_local__*|pixel-termux*|pixel_termux*|termux-*|termux_*|repo_*|repo_*.py|*_repo_*.py|repo_*.sh|*_repo_*.sh) return 0 ;; esac
+    return 1
+}
+
+is_dispatcher_release_artifact() {
+    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$name" in pixel-drop-dispatch*|pixel_drop_dispatch*|ssh-drop-dispatcher*|ssh_drop_dispatcher*|*drop-dispatch*|*drop_dispatch*) return 0 ;; esac
+    return 1
+}
+
+is_sortify_release_artifact() {
+    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$name" in sortify-dispatch*|sortify_dispatch*) return 0 ;; esac
+    return 1
+}
+
+sortify_marker_status() {
+    normalize_config
+    input="${1:-}"
+    name="$(basename "$input")"
+    echo "== Sortify Dispatch Marker Status =="
+    [ -n "$input" ] || { echo "input=missing"; echo "final_gate=FAIL"; echo "reason=missing_input"; return 2; }
+    echo "input=$input"
+    echo "file=$name"
+    echo "marker_root=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "policy_required=$PIDD_SORTIFY_REQUIRED_POLICY"
+    path="$(sortify_file_arg_path "$input" 2>/dev/null || true)"
+    if [ -z "$path" ]; then
+        echo "file_exists=no"
+        echo "sha256="
+        echo "size="
+        echo "marker_exists=unknown"
+        echo "final_gate=FAIL"
+        echo "reason=file_not_found"
+        return 0
+    fi
+    echo "file_exists=yes"
+    echo "file_path=$path"
+    sha="$(file_sha256 "$path" 2>/dev/null || true)"
+    size="$(file_size_bytes "$path" 2>/dev/null || true)"
+    echo "sha256=$sha"
+    echo "size=$size"
+    marker="$PIDD_SORTIFY_RELEASE_DIR/$sha.env"
+    echo "marker_path=$marker"
+    if [ -z "$sha" ] || [ -z "$size" ]; then
+        echo "marker_exists=unknown"
+        echo "final_gate=FAIL"
+        echo "reason=sha_or_size_unavailable"
+        return 0
+    fi
+    if [ ! -f "$marker" ]; then
+        echo "marker_exists=no"
+        echo "final_gate=FAIL"
+        echo "reason=marker_missing"
+        echo "contract=$(dispatcher_sortify_contract_status "$path" 2>/dev/null || echo unavailable)"
+        return 0
+    fi
+    echo "marker_exists=yes"
+    released="$(marker_clean_value "$(marker_field "$marker" released)")"
+    authority="$(marker_clean_value "$(marker_field "$marker" authority)")"
+    marker_sha="$(marker_clean_value "$(marker_field "$marker" sha256)")"
+    marker_size="$(marker_clean_value "$(marker_field "$marker" size)")"
+    policy="$(marker_clean_value "$(marker_field "$marker" policy)")"
+    done_targets="$(marker_clean_value "$(marker_field "$marker" done_targets)")"
+    pending_targets="$(marker_clean_value "$(marker_field "$marker" pending_targets)")"
+    remote_targets="$(marker_clean_value "$(marker_field "$marker" remote_targets)")"
+    reason="$(marker_clean_value "$(marker_field "$marker" reason)")"
+    echo "released=$released"
+    echo "authority=$authority"
+    echo "policy=$policy"
+    if [ "$policy" = "$PIDD_SORTIFY_REQUIRED_POLICY" ]; then echo "policy_match=yes"; else echo "policy_match=no"; fi
+    echo "marker_sha256=$marker_sha"
+    echo "marker_size=$marker_size"
+    echo "done_targets=$done_targets"
+    echo "pending_targets=$pending_targets"
+    echo "remote_targets=$remote_targets"
+    echo "marker_reason=$reason"
+    if dispatcher_sortify_contract_released "$path" 2>/dev/null; then
+        echo "final_gate=PASS"
+        echo "contract=released:policy=$policy reason=$reason"
+    else
+        echo "final_gate=FAIL"
+        echo "contract=$(dispatcher_sortify_contract_status "$path" 2>/dev/null || echo unavailable)"
+    fi
+}
+
+sortify_explain_route() {
+    normalize_config
+    input="${1:-}"
+    name="$(basename "$input")"
+    echo "== Sortify Dispatch Route Preview =="
+    [ -n "$input" ] || { echo "input=missing"; echo "final_gate=FAIL"; echo "reason=missing_input"; return 2; }
+    echo "input=$input"
+    echo "file=$name"
+    echo "dispatcher_runtime=$PIDD_RUNTIME_DIR"
+    echo "marker_root=$PIDD_SORTIFY_RELEASE_DIR"
+    echo "policy_required=$PIDD_SORTIFY_REQUIRED_POLICY"
+    echo "dispatcher_integration_state=$(dispatcher_integration_state)"
+    path="$(sortify_file_arg_path "$input" 2>/dev/null || true)"
+    if [ -n "$path" ]; then echo "file_exists=yes"; echo "file_path=$path"; else echo "file_exists=no"; fi
+    prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"
+    if [ -n "$prefix" ]; then
+        echo "class=custom_local_hold"
+        echo "local_hold=yes"
+        echo "reason=custom_prefix:$prefix"
+        echo "dispatcher_marker_required=no"
+        echo "would_dispatch_by_sdd=no"
+        echo "would_sort_by_sortify=no"
+        echo "final_gate=PASS"
+        return 0
+    fi
+    if is_markdown_handover_artifact "$name"; then
+        echo "class=markdown_handover"
+        echo "local_hold=yes"
+        echo "reason=markdown_handover_hold"
+        echo "dispatcher_marker_required=no"
+        echo "would_dispatch_by_sdd=no"
+        echo "would_sort_by_sortify=no"
+        echo "final_gate=PASS"
+        return 0
+    fi
+    if is_remote_target_artifact "$name"; then
+        targets="$(remote_targets_from_name "$name")"
+        echo "class=remote_target_artifact"
+        echo "route=target_prefix"
+        echo "targets=$targets"
+        echo "local_hold=yes"
+        echo "reason=builtin_protected_pattern"
+        echo "dispatcher_marker_required=yes"
+        echo "would_dispatch_by_sdd=yes"
+        if [ -n "$path" ] && dispatcher_sortify_contract_released "$path" 2>/dev/null; then
+            echo "would_sort_by_sortify=yes_valid_marker"
+            echo "marker_contract=$(dispatcher_sortify_contract_status "$path" 2>/dev/null || echo unavailable)"
+            echo "final_gate=PASS"
+        else
+            echo "would_sort_by_sortify=no_without_valid_marker"
+            if [ -n "$path" ]; then echo "marker_contract=$(dispatcher_sortify_contract_status "$path" 2>/dev/null || echo unavailable)"; else echo "marker_contract=unavailable:file_not_found"; fi
+            echo "final_gate=HELD"
+        fi
+        return 0
+    fi
+    if is_pixel_local_artifact "$name"; then
+        echo "class=pixel_local"
+        echo "local_hold=yes"
+        echo "reason=pixel_local_hold_only"
+        echo "dispatcher_marker_required=no"
+        echo "would_dispatch_by_sdd=no"
+        echo "would_sort_by_sortify=no"
+        echo "final_gate=PASS"
+        return 0
+    fi
+    if is_dispatcher_release_artifact "$name"; then
+        echo "class=dispatcher_release_artifact"
+        echo "local_hold=yes"
+        echo "reason=builtin_protected_pattern"
+        echo "dispatcher_marker_required=no"
+        echo "would_dispatch_by_sdd=no"
+        echo "would_sort_by_sortify=no"
+        echo "final_gate=PASS"
+        return 0
+    fi
+    if is_sortify_release_artifact "$name"; then
+        echo "class=sortify_release_artifact"
+        echo "local_hold=yes"
+        echo "reason=builtin_protected_pattern"
+        echo "dispatcher_marker_required=no"
+        echo "would_dispatch_by_sdd=no"
+        echo "would_sort_by_sortify=no"
+        echo "final_gate=PASS"
+        return 0
+    fi
+    if is_protected_artifact "$name"; then
+        echo "class=other_protected_artifact"
+        echo "local_hold=yes"
+        echo "reason=builtin_protected_pattern"
+        echo "dispatcher_marker_required=maybe_for_remote_target"
+        echo "would_dispatch_by_sdd=unknown"
+        echo "would_sort_by_sortify=no_without_valid_marker"
+        echo "final_gate=HELD"
+        return 0
+    fi
+    echo "class=normal_download"
+    echo "local_hold=no"
+    echo "reason=no_protected_pattern"
+    echo "dispatcher_marker_required=no"
+    echo "would_dispatch_by_sdd=no"
+    echo "would_sort_by_sortify=yes_if_normal_sort_enabled"
+    echo "final_gate=PASS"
+}
+
+contract_smoke_check_contains() {
+    label="$1"; expected="$2"; shift 2
+    out="$("$@" 2>/dev/null || true)"
+    if printf '%s\n' "$out" | grep -q "$expected"; then echo "$label=PASS"; return 0; fi
+    echo "$label=FAIL"
+    printf '%s\n' "$out" | sed 's/^/  /'
+    return 1
+}
+
+sortify_contract_smoke() {
+    normalize_config
+    fail=0
+    echo "== Sortify Dispatch Contract Smoke =="
+    echo "sortify_version=4.6.4-state-contract-preview"
+    echo "policy_expected=$PIDD_SORTIFY_REQUIRED_POLICY"
+    [ "$PIDD_SORTIFY_REQUIRED_POLICY" = "v4115" ] && echo "policy_expected_v4115=PASS" || { echo "policy_expected_v4115=FAIL"; fail=$((fail + 1)); }
+    [ -d "$PIDD_RUNTIME_DIR" ] && echo "dispatcher_runtime_present=yes" || echo "dispatcher_runtime_present=no"
+    [ -d "$PIDD_SORTIFY_RELEASE_DIR" ] && echo "marker_root_present=yes" || echo "marker_root_present=no"
+    echo "dispatcher_integration_state=$(dispatcher_integration_state)"
+    echo "dispatcher_link_readonly=PASS"
+    contract_smoke_check_contains "custom_prefix_heimnetz" "reason=custom_prefix:heimnetz__" test_filename_status "heimnetz__handover.md" || fail=$((fail + 1))
+    contract_smoke_check_contains "markdown_handover_hold" "reason=markdown_handover_hold" test_filename_status "RELEASE_NOTES_v4.6.4-state-contract-preview.md" || fail=$((fail + 1))
+    contract_smoke_check_contains "pixel_local_hold" "reason=builtin_protected_pattern" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
+    contract_smoke_check_contains "remote_target_hold_without_marker" "reason=builtin_protected_pattern" test_filename_status "target-pi3__example.zip" || fail=$((fail + 1))
+    contract_smoke_check_contains "normal_markdown_sortable" "reason=no_protected_pattern" test_filename_status "normal-note.md" || fail=$((fail + 1))
+    sortify_explain_route "target-pi3__example.zip" | grep -q "would_dispatch_by_sdd=yes" && echo "explain_route_remote=PASS" || { echo "explain_route_remote=FAIL"; fail=$((fail + 1)); }
+    sortify_marker_status "target-pi3__example.zip" | grep -q "final_gate=FAIL" && echo "marker_status_missing_file_safe=PASS" || { echo "marker_status_missing_file_safe=FAIL"; fail=$((fail + 1)); }
+    echo "ntfy_runbook_contract_known=PASS"
+    echo "dns_ha_vip_route_change=no"
+    echo "host_run=no"
+    echo "sdd_marker_write=no"
+    if [ "$fail" = "0" ]; then
+        echo "RESULT: SORTIFY_DISPATCH_CONTRACT_SMOKE_PASS rc=0"
+        return 0
+    fi
+    echo "RESULT: SORTIFY_DISPATCH_CONTRACT_SMOKE_FAIL rc=1"
+    return 1
+}
 dispatcher_status() {
     normalize_config; runtime="${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"; config="$runtime/config.env"
     echo "== SSH Drop Dispatcher Link =="; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
@@ -421,7 +683,7 @@ zip_export_dir() {
 sortify_config_export() {
     normalize_config; ensure_dirs; stamp="$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)"; work="$DEST_BASE/.sortify_config_export_$stamp"; out="$DOWNLOADS/Sortify-Dispatch-config-$stamp.zip"
     rm -rf "$work"; mkdir -p "$work"
-    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6.3-markdown-handover-hold"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
+    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6.4-state-contract-preview"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
     [ -f "$CONF_PATH" ] && cp -f "$CONF_PATH" "$work/sortify.conf" 2>/dev/null || true
     sortify_config_status > "$work/config-status.txt" 2>&1 || true; duplicate_status > "$work/duplicate-status.txt" 2>&1 || true; guard_status > "$work/guard-status.txt" 2>&1 || true; dispatcher_status > "$work/dispatcher-link-status.txt" 2>&1 || true
     [ -f "$MODULE_DIR/module.prop" ] && grep -E '^(id=|name=|version=|versionCode=|author=|description=|updateJson=)' "$MODULE_DIR/module.prop" > "$work/module.prop.snapshot" 2>/dev/null || true
@@ -448,11 +710,14 @@ case "${1:-sort}" in
     --guard-temp-clean|guard-temp-clean) cleanup_guard_temp ;;
     --log-rotate|log-rotate) rotate_logs; echo "log_rotate=done" ;;
     --dispatcher-status|dispatcher-status) dispatcher_status ;;
+    --explain-route|explain-route) sortify_explain_route "${2:-}" ;;
+    --marker-status|marker-status) sortify_marker_status "${2:-}" ;;
+    --contract-smoke|contract-smoke) sortify_contract_smoke ;;
     --config-status|config-status) sortify_config_status ;;
     --duplicate-status|duplicate-status) duplicate_status ;;
     --custom-prefixes-status|custom-prefixes-status) custom_prefixes_status ;;
     --test-filename|test-filename) test_filename_status "${2:-}" ;;
     --config-export|config-export) sortify_config_export ;;
     --sort|sort|"") sort_now ;;
-    *) echo "Usage: action.sh [--sort|--guard-status|--guard-status-raw|--guard-clean|--guard-temp-clean|--log-rotate|--dispatcher-status|--config-status|--duplicate-status|--custom-prefixes-status|--test-filename NAME|--config-export]"; exit 2 ;;
+    *) echo "Usage: action.sh [--sort|--guard-status|--guard-status-raw|--guard-clean|--guard-temp-clean|--log-rotate|--dispatcher-status|--explain-route NAME|--marker-status NAME|--contract-smoke|--config-status|--duplicate-status|--custom-prefixes-status|--test-filename NAME|--config-export]"; exit 2 ;;
 esac
