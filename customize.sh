@@ -14,7 +14,7 @@ preserve_existing_config() {
 
     ui_print "- Preserving existing Sortify config..."
 
-    for key in         INTERVAL         GUARD_LOG         SORTIFY_NORMAL_SORT         SORTIFY_HOLD_PROTECTED         SORTIFY_DISPATCHER_INTEGRATION         SORTIFY_CUSTOM_PARK_PREFIXES         SORTIFY_GUARD_MAX_FILES         SORTIFY_GUARD_STATUS_TIMEOUT         SORTIFY_DUPLICATE_MODE         SORTIFY_LOG_MAX_KB         SORTIFY_GUARD_TEMP_CLEAN_ON_SORT; do
+    for key in         INTERVAL         GUARD_LOG         SORTIFY_NORMAL_SORT         SORTIFY_SORT_MODE         SORTIFY_HOLD_PROTECTED         SORTIFY_DISPATCHER_INTEGRATION         SORTIFY_CUSTOM_PARK_PREFIXES         SORTIFY_GUARD_MAX_FILES         SORTIFY_GUARD_STATUS_TIMEOUT         SORTIFY_DUPLICATE_MODE         SORTIFY_LOG_MAX_KB         SORTIFY_GUARD_TEMP_CLEAN_ON_SORT         SORTIFY_PREVIEW_MAX_FILES; do
 
         line="$(grep -E "^${key}=" "$active_conf" 2>/dev/null | tail -n 1 || true)"
         [ -n "$line" ] || continue

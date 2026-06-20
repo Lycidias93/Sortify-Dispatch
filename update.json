@@ -1,6 +1,6 @@
 {
-  "version": "4.6.4-state-contract-preview",
-  "versionCode": 22,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.6.4-state-contract-preview/Sortify-Dispatch-v4.6.4-state-contract-preview.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.6.4-state-contract-preview.md"
+  "version": "4.6.5-sort-mode-control",
+  "versionCode": 23,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.6.5-sort-mode-control/Sortify-Dispatch-v4.6.5-sort-mode-control.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.6.5-sort-mode-control.md"
 }
