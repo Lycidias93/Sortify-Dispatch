@@ -13,6 +13,7 @@ if [ ! -f "$CONF" ]; then
         echo "SORTIFY_DISPATCHER_INTEGRATION=auto"
         echo "SORTIFY_HOLD_PROTECTED=1"
         echo "SORTIFY_NORMAL_SORT=1"
+        echo "SORTIFY_SORT_MODE=interval"
         echo "SORTIFY_DISPATCHER_RUNTIME_DIR=/data/adb/ssh-drop-dispatcher"
         echo "SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115"
         echo "SORTIFY_DISPATCHER_RELEASE_DIR=/data/adb/ssh-drop-dispatcher/integration/sortify-release"
@@ -46,18 +47,19 @@ wait_until_storage
         case "${SORTIFY_DISPATCHER_INTEGRATION:-auto}" in off|auto|on) ;; *) SORTIFY_DISPATCHER_INTEGRATION=auto ;; esac
         case "${SORTIFY_HOLD_PROTECTED:-1}" in 0|1) ;; *) SORTIFY_HOLD_PROTECTED=1 ;; esac
         case "${SORTIFY_NORMAL_SORT:-1}" in 0|1) ;; *) SORTIFY_NORMAL_SORT=1 ;; esac
+        case "${SORTIFY_SORT_MODE:-interval}" in interval|manual|boot_once) ;; *) SORTIFY_SORT_MODE=interval ;; esac
         SORTIFY_DISPATCHER_RUNTIME_DIR="${SORTIFY_DISPATCHER_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
         SORTIFY_DISPATCHER_REQUIRED_POLICY="${SORTIFY_DISPATCHER_REQUIRED_POLICY:-v4115}"
         SORTIFY_DISPATCHER_RELEASE_DIR="${SORTIFY_DISPATCHER_RELEASE_DIR:-$SORTIFY_DISPATCHER_RUNTIME_DIR/integration/sortify-release}"
-        export INTERVAL GUARD_LOG SORTIFY_DISPATCHER_INTEGRATION SORTIFY_HOLD_PROTECTED SORTIFY_NORMAL_SORT SORTIFY_DISPATCHER_RUNTIME_DIR SORTIFY_DISPATCHER_REQUIRED_POLICY SORTIFY_DISPATCHER_RELEASE_DIR
+        export INTERVAL GUARD_LOG SORTIFY_DISPATCHER_INTEGRATION SORTIFY_HOLD_PROTECTED SORTIFY_NORMAL_SORT SORTIFY_SORT_MODE SORTIFY_DISPATCHER_RUNTIME_DIR SORTIFY_DISPATCHER_REQUIRED_POLICY SORTIFY_DISPATCHER_RELEASE_DIR
         # SORTIFY_SERVICE_CONFIG_SANITIZE_V1_END
 
         # Run the action script
         # We redirect stdout/stderr to log to capture any 'echo' from action.sh
-        sh "$MODDIR/action.sh" >> "$LOG" 2>&1
+        sh "$MODDIR/action.sh" --service-cycle >> "$LOG" 2>&1
         
         # Log the service heartbeat
-        echo "[Service] $(date '+%Y-%m-%d %H:%M:%S') - Cycle complete. Sleeping ${INTERVAL}s" >> "$LOG"
+        echo "[Service] $(date '+%Y-%m-%d %H:%M:%S') - Cycle complete mode ${SORTIFY_SORT_MODE:-interval}. Sleeping ${INTERVAL}s" >> "$LOG"
         
         # Prune log (Keep last 200 lines)
         tail -n 200 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"

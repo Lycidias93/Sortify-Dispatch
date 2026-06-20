@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Sortify Dispatch v4.6.4-state-contract-preview - Manual Action / Guard Tools
+# Sortify Dispatch 4.6.5-sort-mode-control - Manual Action / Guard Tools
 
 ui_print() {
     echo "$1"
@@ -13,12 +13,14 @@ GUARD_LOG="${GUARD_LOG:-1}"
 SORTIFY_DISPATCHER_INTEGRATION="${SORTIFY_DISPATCHER_INTEGRATION:-auto}"
 SORTIFY_HOLD_PROTECTED="${SORTIFY_HOLD_PROTECTED:-1}"
 SORTIFY_NORMAL_SORT="${SORTIFY_NORMAL_SORT:-1}"
+SORTIFY_SORT_MODE="${SORTIFY_SORT_MODE:-interval}"
 SORTIFY_CUSTOM_PARK_PREFIXES="${SORTIFY_CUSTOM_PARK_PREFIXES:-}"
 SORTIFY_GUARD_MAX_FILES="${SORTIFY_GUARD_MAX_FILES:-300}"
 SORTIFY_GUARD_STATUS_TIMEOUT="${SORTIFY_GUARD_STATUS_TIMEOUT:-8}"
 SORTIFY_DUPLICATE_MODE="${SORTIFY_DUPLICATE_MODE:-filename}"
 SORTIFY_LOG_MAX_KB="${SORTIFY_LOG_MAX_KB:-1024}"
 SORTIFY_GUARD_TEMP_CLEAN_ON_SORT="${SORTIFY_GUARD_TEMP_CLEAN_ON_SORT:-1}"
+SORTIFY_PREVIEW_MAX_FILES="${SORTIFY_PREVIEW_MAX_FILES:-50}"
 SORTIFY_DISPATCHER_RUNTIME_DIR="${SORTIFY_DISPATCHER_RUNTIME_DIR:-${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}}"
 SORTIFY_DISPATCHER_REQUIRED_POLICY="${SORTIFY_DISPATCHER_REQUIRED_POLICY:-${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}}"
 SORTIFY_DISPATCHER_RELEASE_DIR="${SORTIFY_DISPATCHER_RELEASE_DIR:-${PIDD_SORTIFY_RELEASE_DIR:-$SORTIFY_DISPATCHER_RUNTIME_DIR/integration/sortify-release}}"
@@ -35,6 +37,7 @@ normalize_config() {
     case "${SORTIFY_DISPATCHER_INTEGRATION:-auto}" in off|auto|on) ;; *) SORTIFY_DISPATCHER_INTEGRATION="auto" ;; esac
     case "${SORTIFY_HOLD_PROTECTED:-1}" in 0|1) ;; *) SORTIFY_HOLD_PROTECTED="1" ;; esac
     case "${SORTIFY_NORMAL_SORT:-1}" in 0|1) ;; *) SORTIFY_NORMAL_SORT="1" ;; esac
+    case "${SORTIFY_SORT_MODE:-interval}" in interval|manual|boot_once) ;; *) SORTIFY_SORT_MODE="interval" ;; esac
     case "${SORTIFY_DUPLICATE_MODE:-filename}" in filename|checksum_delete_identical) ;; *) SORTIFY_DUPLICATE_MODE="filename" ;; esac
     case "${SORTIFY_GUARD_TEMP_CLEAN_ON_SORT:-1}" in 0|1) ;; *) SORTIFY_GUARD_TEMP_CLEAN_ON_SORT="1" ;; esac
     case "${SORTIFY_GUARD_MAX_FILES:-300}" in ""|*[!0-9]*) SORTIFY_GUARD_MAX_FILES="300" ;; esac
@@ -46,6 +49,9 @@ normalize_config() {
     case "${SORTIFY_LOG_MAX_KB:-1024}" in ""|*[!0-9]*) SORTIFY_LOG_MAX_KB="1024" ;; esac
     [ "$SORTIFY_LOG_MAX_KB" -lt 64 ] 2>/dev/null && SORTIFY_LOG_MAX_KB="64"
     [ "$SORTIFY_LOG_MAX_KB" -gt 16384 ] 2>/dev/null && SORTIFY_LOG_MAX_KB="16384"
+    case "${SORTIFY_PREVIEW_MAX_FILES:-50}" in ""|*[!0-9]*) SORTIFY_PREVIEW_MAX_FILES="50" ;; esac
+    [ "$SORTIFY_PREVIEW_MAX_FILES" -lt 1 ] 2>/dev/null && SORTIFY_PREVIEW_MAX_FILES="1"
+    [ "$SORTIFY_PREVIEW_MAX_FILES" -gt 200 ] 2>/dev/null && SORTIFY_PREVIEW_MAX_FILES="200"
     PIDD_RUNTIME_DIR="${PIDD_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
     PIDD_SORTIFY_REQUIRED_POLICY="${PIDD_SORTIFY_REQUIRED_POLICY:-v4115}"
     PIDD_SORTIFY_RELEASE_DIR="${PIDD_SORTIFY_RELEASE_DIR:-$PIDD_RUNTIME_DIR/integration/sortify-release}"
@@ -350,7 +356,7 @@ guard_status_raw() {
     find_misplaced_protected > "$tmp_misplaced" || true
     find_protected_under "$DEST_BASE/GuardConflicts" > "$tmp_conflicts" || true
     download_count="$(count_lines < "$tmp_download")"; misplaced_count="$(count_lines < "$tmp_misplaced")"; conflict_count="$(count_lines < "$tmp_conflicts")"
-    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6.4-state-contract-preview"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
+    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6.5-sort-mode-control"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
     if [ "$misplaced_count" = "0" ]; then echo "guard_status=pass"; else echo "guard_status=needs_clean"; echo "-- misplaced --"; cat "$tmp_misplaced"; fi
     rm -f "$tmp_misplaced" "$tmp_download" "$tmp_conflicts"
 }
@@ -387,7 +393,7 @@ guard_clean() {
 
 sortify_config_status() {
     normalize_config
-    echo "== Sortify Dispatch Config =="; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "conf_path=$CONF_PATH"; echo "guard_log=${GUARD_LOG:-1}"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"; echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "sortify_duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "sortify_log_max_kb=$SORTIFY_LOG_MAX_KB"; echo "sortify_guard_temp_clean_on_sort=$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT"; echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"; echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"; echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "sortify_contract=policy_v4115_sha_size_authority_pending"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
+    echo "== Sortify Dispatch Config =="; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "conf_path=$CONF_PATH"; echo "guard_log=${GUARD_LOG:-1}"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "sortify_sort_mode=$SORTIFY_SORT_MODE"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"; echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "sortify_duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "sortify_log_max_kb=$SORTIFY_LOG_MAX_KB"; echo "sortify_guard_temp_clean_on_sort=$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT"; echo "sortify_preview_max_files=$SORTIFY_PREVIEW_MAX_FILES"; echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"; echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"; echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "sortify_contract=policy_v4115_sha_size_authority_pending"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
 }
 
 duplicate_status() { normalize_config; echo "== Sortify Dispatch Duplicate Handling =="; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "checksum_delete_identical_supported=yes"; echo "identical_checksum_action=delete_source"; echo "same_name_different_checksum_action=move_to_duplicates"; echo "checksum_unavailable_action=move_to_duplicates"; }
@@ -399,6 +405,7 @@ test_filename_status() {
     prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"; echo "== Sortify Dispatch Filename Test =="; echo "filename=$name"
     if [ -n "$prefix" ]; then echo "local_hold=yes"; echo "reason=custom_prefix:$prefix"; echo "dispatcher_marker_required=no"; echo "would_sort=no"; return 0; fi
     if is_markdown_handover_artifact "$name"; then echo "local_hold=yes"; echo "reason=markdown_handover_hold"; echo "dispatcher_marker_required=no"; echo "would_sort=no"; return 0; fi
+    if is_pixel_local_artifact "$name"; then echo "local_hold=yes"; echo "reason=pixel_local_hold_only"; echo "dispatcher_marker_required=no"; echo "would_sort=no"; return 0; fi
     if is_protected_artifact "$name"; then echo "local_hold=yes"; echo "reason=builtin_protected_pattern"; echo "dispatcher_marker_required=maybe_for_remote_target"; echo "would_sort=no_without_valid_marker"; return 0; fi
     echo "local_hold=no"; echo "reason=no_protected_pattern"; echo "dispatcher_marker_required=no"; echo "would_sort=yes_if_normal_sort_enabled"
 }
@@ -640,7 +647,7 @@ sortify_contract_smoke() {
     normalize_config
     fail=0
     echo "== Sortify Dispatch Contract Smoke =="
-    echo "sortify_version=4.6.4-state-contract-preview"
+    echo "sortify_version=4.6.5-sort-mode-control"
     echo "policy_expected=$PIDD_SORTIFY_REQUIRED_POLICY"
     [ "$PIDD_SORTIFY_REQUIRED_POLICY" = "v4115" ] && echo "policy_expected_v4115=PASS" || { echo "policy_expected_v4115=FAIL"; fail=$((fail + 1)); }
     [ -d "$PIDD_RUNTIME_DIR" ] && echo "dispatcher_runtime_present=yes" || echo "dispatcher_runtime_present=no"
@@ -648,12 +655,15 @@ sortify_contract_smoke() {
     echo "dispatcher_integration_state=$(dispatcher_integration_state)"
     echo "dispatcher_link_readonly=PASS"
     contract_smoke_check_contains "custom_prefix_heimnetz" "reason=custom_prefix:heimnetz__" test_filename_status "heimnetz__handover.md" || fail=$((fail + 1))
-    contract_smoke_check_contains "markdown_handover_hold" "reason=markdown_handover_hold" test_filename_status "RELEASE_NOTES_v4.6.4-state-contract-preview.md" || fail=$((fail + 1))
-    contract_smoke_check_contains "pixel_local_hold" "reason=builtin_protected_pattern" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
+    contract_smoke_check_contains "markdown_handover_hold" "reason=markdown_handover_hold" test_filename_status "RELEASE_NOTES_4.6.5-sort-mode-control.md" || fail=$((fail + 1))
+    contract_smoke_check_contains "pixel_local_hold_local_hold" "local_hold=yes" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
+    contract_smoke_check_contains "pixel_local_hold_no_marker" "dispatcher_marker_required=no" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
+    contract_smoke_check_contains "pixel_local_hold_no_sort" "would_sort=no" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
     contract_smoke_check_contains "remote_target_hold_without_marker" "reason=builtin_protected_pattern" test_filename_status "target-pi3__example.zip" || fail=$((fail + 1))
     contract_smoke_check_contains "normal_markdown_sortable" "reason=no_protected_pattern" test_filename_status "normal-note.md" || fail=$((fail + 1))
     sortify_explain_route "target-pi3__example.zip" | grep -q "would_dispatch_by_sdd=yes" && echo "explain_route_remote=PASS" || { echo "explain_route_remote=FAIL"; fail=$((fail + 1)); }
     sortify_marker_status "target-pi3__example.zip" | grep -q "final_gate=FAIL" && echo "marker_status_missing_file_safe=PASS" || { echo "marker_status_missing_file_safe=FAIL"; fail=$((fail + 1)); }
+    sortify_mode_status | grep -q "manual_sort_now=available" && echo "mode_status=PASS" || { echo "mode_status=FAIL"; fail=$((fail + 1)); }
     echo "ntfy_runbook_contract_known=PASS"
     echo "dns_ha_vip_route_change=no"
     echo "host_run=no"
@@ -683,13 +693,115 @@ zip_export_dir() {
 sortify_config_export() {
     normalize_config; ensure_dirs; stamp="$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)"; work="$DEST_BASE/.sortify_config_export_$stamp"; out="$DOWNLOADS/Sortify-Dispatch-config-$stamp.zip"
     rm -rf "$work"; mkdir -p "$work"
-    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6.4-state-contract-preview"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
+    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6.5-sort-mode-control"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
     [ -f "$CONF_PATH" ] && cp -f "$CONF_PATH" "$work/sortify.conf" 2>/dev/null || true
     sortify_config_status > "$work/config-status.txt" 2>&1 || true; duplicate_status > "$work/duplicate-status.txt" 2>&1 || true; guard_status > "$work/guard-status.txt" 2>&1 || true; dispatcher_status > "$work/dispatcher-link-status.txt" 2>&1 || true
     [ -f "$MODULE_DIR/module.prop" ] && grep -E '^(id=|name=|version=|versionCode=|author=|description=|updateJson=)' "$MODULE_DIR/module.prop" > "$work/module.prop.snapshot" 2>/dev/null || true
     (cd "$work" && find . -type f | sort | while IFS= read -r f; do sha256sum "$f" 2>/dev/null || toybox sha256sum "$f" 2>/dev/null || true; done > SHA256SUMS)
     rm -f "$out"; zip_export_dir "$work" "$out" || return $?; chmod 600 "$out" 2>/dev/null || true; rm -rf "$work"
     echo "== Sortify Dispatch Config Export =="; echo "config_export=done"; echo "config_zip=$out"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"
+}
+
+
+current_boot_id() {
+    if [ -r /proc/sys/kernel/random/boot_id ]; then cat /proc/sys/kernel/random/boot_id 2>/dev/null | sed -n '1p'; return 0; fi
+    awk '{print int($1)}' /proc/uptime 2>/dev/null || date '+%s' 2>/dev/null || echo unknown
+}
+
+sortify_mode_status() {
+    normalize_config
+    echo "== Sortify Dispatch Mode Status =="
+    echo "version=4.6.5-sort-mode-control"
+    echo "sortify_sort_mode=$SORTIFY_SORT_MODE"
+    echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"
+    echo "manual_sort_now=available"
+    case "$SORTIFY_SORT_MODE" in
+        interval) echo "automatic_sorting=interval"; echo "service_cycle_action=sort_every_interval" ;;
+        manual) echo "automatic_sorting=disabled"; echo "service_cycle_action=skip_until_manual_sort" ;;
+        boot_once) echo "automatic_sorting=boot_once"; echo "service_cycle_action=sort_once_per_boot" ;;
+    esac
+    echo "sdd_marker_write=no"
+    echo "host_run=no"
+}
+
+sortify_category_for_name() {
+    name="$1"
+    lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+    ext=""
+    case "$lower" in *.*) ext="${lower##*.}" ;; esac
+    for e in $DOC_EXT; do [ "$ext" = "$e" ] && { echo Documents; return 0; }; done
+    for e in $IMG_EXT; do [ "$ext" = "$e" ] && { echo Images; return 0; }; done
+    for e in $VID_EXT; do [ "$ext" = "$e" ] && { echo Videos; return 0; }; done
+    for e in $AUD_EXT; do [ "$ext" = "$e" ] && { echo Audio; return 0; }; done
+    for e in $ARC_EXT; do [ "$ext" = "$e" ] && { echo Archives; return 0; }; done
+    for e in $APP_EXT; do [ "$ext" = "$e" ] && { echo Apps; return 0; }; done
+    for e in $EBOOK_EXT; do [ "$ext" = "$e" ] && { echo Ebooks; return 0; }; done
+    for e in $CODE_EXT; do [ "$ext" = "$e" ] && { echo Code; return 0; }; done
+    for e in $CONFIG_EXT; do [ "$ext" = "$e" ] && { echo Config; return 0; }; done
+    for e in $DATA_EXT; do [ "$ext" = "$e" ] && { echo Data; return 0; }; done
+    for e in $FONT_EXT; do [ "$ext" = "$e" ] && { echo Fonts; return 0; }; done
+    for e in $CERT_EXT; do [ "$ext" = "$e" ] && { echo Certificates; return 0; }; done
+    for e in $BACKUP_EXT; do [ "$ext" = "$e" ] && { echo Backups; return 0; }; done
+    for e in $TORRENT_EXT; do [ "$ext" = "$e" ] && { echo Torrents; return 0; }; done
+    echo Others
+}
+
+sortify_preview_one() {
+    file="$1"
+    filename="$(basename "$file")"
+    is_skip_candidate "$filename" && { echo "file=$filename action=skip reason=temp_or_hidden target=$file"; return 0; }
+    if should_hold_protected_artifact "$file"; then
+        echo "file=$filename action=hold reason=protected_or_dispatcher_contract target=$DOWNLOADS/$filename"
+        return 0
+    fi
+    category="$(sortify_category_for_name "$filename")"
+    echo "file=$filename action=would_sort reason=normal_download target=$DEST_BASE/$category/$filename"
+}
+
+sortify_preview_sort() {
+    normalize_config
+    max="${SORTIFY_PREVIEW_MAX_FILES:-50}"
+    case "$max" in ""|*[!0-9]*) max=50 ;; esac
+    [ "$max" -lt 1 ] 2>/dev/null && max=1
+    [ "$max" -gt 200 ] 2>/dev/null && max=200
+    echo "== Sortify Dispatch Preview Sort =="
+    echo "version=4.6.5-sort-mode-control"
+    echo "download=$DOWNLOADS"
+    echo "dest_base=$DEST_BASE"
+    echo "preview_max_files=$max"
+    echo "dry_run=yes"
+    find "$DOWNLOADS" -maxdepth 1 -type f -print 2>/dev/null | sort | sed -n "1,${max}p" | while IFS= read -r file; do sortify_preview_one "$file"; done
+    echo "preview_complete=yes"
+    echo "sdd_marker_write=no"
+}
+
+sortify_service_cycle() {
+    normalize_config
+    case "$SORTIFY_SORT_MODE" in
+        manual)
+            ui_print "Sortify automatic sorting disabled by SORTIFY_SORT_MODE=manual"
+            log_guard "service cycle skipped mode=manual manual_sort_now_available=yes"
+            return 0
+            ;;
+        boot_once)
+            boot_id="$(current_boot_id)"
+            state_file="$MODULE_DIR/.sortify_boot_once_done"
+            previous=""
+            [ -f "$state_file" ] && previous="$(cat "$state_file" 2>/dev/null | sed -n '1p')"
+            if [ "$previous" = "$boot_id" ]; then
+                ui_print "Sortify boot_once already completed for this boot"
+                log_guard "service cycle skipped mode=boot_once boot_id=$boot_id"
+                return 0
+            fi
+            sort_now
+            rc=$?
+            if [ "$rc" = "0" ]; then mkdir -p "$MODULE_DIR" 2>/dev/null || true; printf '%s\n' "$boot_id" > "$state_file" 2>/dev/null || true; fi
+            return "$rc"
+            ;;
+        interval|*)
+            sort_now
+            ;;
+    esac
 }
 
 sort_now() {
@@ -713,11 +825,14 @@ case "${1:-sort}" in
     --explain-route|explain-route) sortify_explain_route "${2:-}" ;;
     --marker-status|marker-status) sortify_marker_status "${2:-}" ;;
     --contract-smoke|contract-smoke) sortify_contract_smoke ;;
+    --mode-status|mode-status) sortify_mode_status ;;
+    --preview-sort|preview-sort) sortify_preview_sort ;;
+    --service-cycle|service-cycle) sortify_service_cycle ;;
     --config-status|config-status) sortify_config_status ;;
     --duplicate-status|duplicate-status) duplicate_status ;;
     --custom-prefixes-status|custom-prefixes-status) custom_prefixes_status ;;
     --test-filename|test-filename) test_filename_status "${2:-}" ;;
     --config-export|config-export) sortify_config_export ;;
     --sort|sort|"") sort_now ;;
-    *) echo "Usage: action.sh [--sort|--guard-status|--guard-status-raw|--guard-clean|--guard-temp-clean|--log-rotate|--dispatcher-status|--explain-route NAME|--marker-status NAME|--contract-smoke|--config-status|--duplicate-status|--custom-prefixes-status|--test-filename NAME|--config-export]"; exit 2 ;;
+    *) echo "Usage: action.sh [--sort|--mode-status|--preview-sort|--service-cycle|--guard-status|--guard-status-raw|--guard-clean|--guard-temp-clean|--log-rotate|--dispatcher-status|--explain-route NAME|--marker-status NAME|--contract-smoke|--config-status|--duplicate-status|--custom-prefixes-status|--test-filename NAME|--config-export]"; exit 2 ;;
 esac

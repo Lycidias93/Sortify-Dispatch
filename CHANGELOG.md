@@ -1,3 +1,13 @@
+<!-- CHANGELOG_SORTIFY_DISPATCH_V465_SORT_MODE_CONTROL_START -->
+## 4.6.5-sort-mode-control - Sort Mode Control
+
+- Added `SORTIFY_SORT_MODE=interval|manual|boot_once`.
+- Added WebUI sort mode selector, Mode Status and bounded Preview Sort.
+- Split automatic service execution into `--service-cycle` while keeping `--sort` as manual Sort Now.
+- Kept Sortify/SDD policy contract at `v4115` and SDD marker root read-only.
+- No SDD target management, SSH key handling, host-run, DNS/HA/VIP/route or host-drop changes.
+<!-- CHANGELOG_SORTIFY_DISPATCH_V465_SORT_MODE_CONTROL_END -->
+
 <!-- CHANGELOG_SORTIFY_DISPATCH_V464_STATE_CONTRACT_PREVIEW_START -->
 ## 4.6.4-state-contract-preview - State Contract Preview
 

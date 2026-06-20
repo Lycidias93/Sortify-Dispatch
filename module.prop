@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.6.4-state-contract-preview
-versionCode=22
+version=4.6.5-sort-mode-control
+versionCode=23
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch v4.6.4: read-only state/contract preview for SDD policy v4115 markers.
+description=Sortify Dispatch v4.6.5: sort mode control for interval/manual/boot_once plus bounded preview sort.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png

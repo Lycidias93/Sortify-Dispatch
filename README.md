@@ -1,3 +1,25 @@
+<!-- SORTIFY_DISPATCH_V465_SORT_MODE_CONTROL_START -->
+## Sortify Dispatch v4.6.5 - Sort Mode Control
+
+Release: `4.6.5-sort-mode-control` / `versionCode=23`.
+
+This release adds explicit automatic sort mode control:
+
+- `interval`: service sorts every configured interval.
+- `manual`: disables automatic timed sorting while keeping Sort Now available.
+- `boot_once`: sorts once after reboot, then skips further service cycles until the next reboot.
+
+New CLI/WebUI actions:
+
+```sh
+su -c sh /data/adb/modules/sortify/action.sh --mode-status
+su -c sh /data/adb/modules/sortify/action.sh --preview-sort
+su -c sh /data/adb/modules/sortify/action.sh --sort
+```
+
+Scope remains unchanged for infrastructure safety: no SDD marker writes, no SDD target management, no SSH key handling, no host-run, no DNS/HA/VIP/route changes.
+<!-- SORTIFY_DISPATCH_V465_SORT_MODE_CONTROL_END -->
+
 <!-- SORTIFY_DISPATCH_V464_STATE_CONTRACT_PREVIEW_START -->
 ## Sortify Dispatch v4.6.4 - State Contract Preview
 
@@ -115,7 +137,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.6.4-state-contract-preview
+**Version:** 4.6.5-sort-mode-control
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
