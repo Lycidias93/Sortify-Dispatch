@@ -1,3 +1,9 @@
+<!-- SORTIFY_DOWNLOAD_CLEANUP_MAINTENANCE_VNEXT_README_START -->
+## vNext: Download cleanup maintenance
+
+Sortify Dispatch has a planned Pixel-local Download cleanup maintenance helper with `scan`, `guard`, `archive-safe`, `verify` and `rollback-info` commands. The helper is explicit/manual only and does not run from service, boot, watcher, watchdog or queue processing. It protects `pixel_local__*`, `heimnetz__*`, `target-*__*`, `targets-*__*`, active app folders, dot/runtime names and Git worktrees.
+<!-- SORTIFY_DOWNLOAD_CLEANUP_MAINTENANCE_VNEXT_README_END -->
+
 <!-- SORTIFY_DISPATCH_V465_SORT_MODE_CONTROL_START -->
 ## Sortify Dispatch v4.6.5 - Sort Mode Control
 
