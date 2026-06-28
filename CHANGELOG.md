@@ -1,3 +1,12 @@
+<!-- SORTIFY_DOWNLOAD_CLEANUP_MAINTENANCE_VNEXT_CHANGELOG_START -->
+## vNext - Download cleanup maintenance
+
+- Added a planned Pixel-local Download cleanup maintenance helper with scan, guard, archive-safe, verify and rollback-info commands.
+- Kept archive-safe explicit/manual only; no service, boot, watcher, watchdog or queue integration.
+- Protected `pixel_local__*`, `heimnetz__*`, target prefixes, dot/runtime names, active app folders and Git worktrees.
+- Kept SDD marker writes, host-run, SSH and DNS/HA/VIP/route behavior unchanged.
+<!-- SORTIFY_DOWNLOAD_CLEANUP_MAINTENANCE_VNEXT_CHANGELOG_END -->
+
 <!-- CHANGELOG_SORTIFY_DISPATCH_V465_SORT_MODE_CONTROL_START -->
 ## 4.6.5-sort-mode-control - Sort Mode Control
 
