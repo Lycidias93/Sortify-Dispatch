@@ -1,3 +1,9 @@
+<!-- SORTIFY_DOWNLOAD_CLEANUP_STALE_REVIEW_ROLLBACK_INFO_START -->
+## vNext: Download cleanup stale review and rollback info
+
+Sortify Download cleanup maintenance now plans `stale_review_candidates.tsv` for old-looking `pixel_local__*` helper artifacts while preserving the local-hold contract. `archive-safe` still moves only guarded safe candidates. `rollback-info` reports the latest run, manifest, rollback, archive and items paths. No service, boot, watcher, watchdog or queue integration is added.
+<!-- SORTIFY_DOWNLOAD_CLEANUP_STALE_REVIEW_ROLLBACK_INFO_END -->
+
 <!-- SORTIFY_DOWNLOAD_CLEANUP_MAINTENANCE_VNEXT_README_START -->
 ## vNext: Download cleanup maintenance
 
