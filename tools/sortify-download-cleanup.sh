@@ -53,7 +53,7 @@ review_name() {
 safe_name() {
   local name="$1" path="$2"
   case "$name" in
-    Sortify-Dispatch-v*.zip|ssh-drop-dispatcher-magisk-v*.zip|pixel-drop-dispatch*.zip) return 0 ;;
+    Sortify-Dispatch-v*.zip|ssh-drop-dispatcher-magisk_v*.zip|pixel-drop-dispatch*.zip) return 0 ;;
     handover_*.md|mini_handover_*.md|magisk_install_log_*.log|pixel_thermal_*.txt) return 0 ;;
     __pycache__) return 0 ;;
     *.sha256) return 0 ;;
@@ -216,11 +216,97 @@ rollback_info_cmd() {
   echo "RESULT: SORTIFY_DOWNLOAD_ROLLBACK_INFO_DONE rc=0"
 }
 
+archive_review_approved_dry_run_cmd() {
+  if [ -z "${SORTIFY_CLEANUP_RUN_ID:-}" ] && [ -z "${SORTIFY_CLEANUP_RUN_DIR:-}" ]; then
+    echo "archive_review_exact_run=FAIL"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_FAIL rc=31"
+    exit 31
+  fi
+  if [ "${SORTIFY_CLEANUP_APPROVED_FOR_ARCHIVE:-no}" != "yes" ]; then
+    echo "approved_for_archive=no"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_APPROVAL_REQUIRED rc=32"
+    exit 32
+  fi
+
+  local preview="${SORTIFY_CLEANUP_APPROVAL_PREVIEW:-$RUN_DIR/stale_review_approval_preview/approval_preview.tsv}"
+  local planned="${SORTIFY_CLEANUP_PLANNED_MANIFEST:-$RUN_DIR/planned_review_archive_manifest.tsv}"
+  local review_archive="${SORTIFY_CLEANUP_REVIEW_ARCHIVE_DIR:-$ARCHIVE_ROOT/review_archive_$RUN_ID}"
+  local review_items="$review_archive/items"
+  local invalid="$RUN_DIR/archive_review_invalid_candidates.tsv"
+  local missing="$RUN_DIR/archive_review_missing_sources.tsv"
+  local dupes="$RUN_DIR/archive_review_duplicate_destinations.tsv"
+  local tmp="$planned.tmp"
+
+  test -f "$preview"
+  awk -F '	' 'NR==1 && $1=="decision" && $2=="bucket" && $5=="name" && $7=="path" {ok=1} END {exit ok ? 0 : 1}' "$preview"
+
+  awk -F '	' 'NR>1 && $1=="candidate_for_manual_archive_review" && $2!="A_temp_helper_scripts" && $2!="C_logs_boot_watch_thermal_txt" {print}' "$preview" > "$invalid"
+  if [ -s "$invalid" ]; then
+    echo "archive_review_invalid_candidates=FAIL"
+    cat "$invalid"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_FAIL rc=33"
+    exit 33
+  fi
+
+  : > "$missing"
+  printf 'name	source	destination	bucket	decision
+' > "$tmp"
+  tail -n +2 "$preview" | while IFS="$(printf '	')" read -r decision bucket family extension name reason path note; do
+    [ "$decision" = "candidate_for_manual_archive_review" ] || continue
+    case "$name" in ""|*/*) echo "$name" >> "$missing"; continue ;; esac
+    if [ ! -e "$path" ]; then
+      printf '%s	%s
+' "$name" "$path" >> "$missing"
+      continue
+    fi
+    dest="$review_items/$name"
+    printf '%s	%s	%s	%s	%s
+' "$name" "$path" "$dest" "$bucket" "$decision" >> "$tmp"
+  done
+
+  if [ -s "$missing" ]; then
+    echo "archive_review_missing_sources=FAIL"
+    cat "$missing"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_FAIL rc=34"
+    exit 34
+  fi
+
+  awk -F '	' 'NR>1 {c[$3]++; if (c[$3] == 2) print $3}' "$tmp" > "$dupes"
+  if [ -s "$dupes" ]; then
+    echo "archive_review_duplicate_destinations=FAIL"
+    cat "$dupes"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_FAIL rc=35"
+    exit 35
+  fi
+
+  mv "$tmp" "$planned"
+  candidate_count=$(( $(wc -l < "$planned") - 1 ))
+  hold_count="$(awk -F '	' 'NR>1 && $1=="hold" {c++} END {print c+0}' "$preview")"
+  echo "archive_review_mode=dry-run"
+  echo "approved_for_archive=yes"
+  echo "run=$RUN_DIR"
+  echo "approval_preview=$preview"
+  echo "planned_manifest=$planned"
+  echo "archive=$review_archive"
+  echo "items=$review_items"
+  echo "candidate_for_manual_archive_review=$candidate_count"
+  echo "hold=$hold_count"
+  echo "archive_safe=no"
+  echo "file_move=no"
+  echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_DONE rc=0"
+}
+
 case "${1:-}" in
   scan) scan_cmd ;;
   guard) guard_cmd ;;
   archive-safe) archive_safe_cmd ;;
   verify) verify_cmd ;;
   rollback-info) rollback_info_cmd ;;
-  *) echo "Usage: sortify-download-cleanup.sh scan|guard|archive-safe|verify|rollback-info"; exit 2 ;;
+  archive-review-approved)
+    case "${2:-}" in
+      dry-run) archive_review_approved_dry_run_cmd ;;
+      *) echo "Usage: sortify-download-cleanup.sh archive-review-approved dry-run"; exit 2 ;;
+    esac
+    ;;
+  *) echo "Usage: sortify-download-cleanup.sh scan|guard|archive-safe|verify|rollback-info|archive-review-approved dry-run"; exit 2 ;;
 esac
