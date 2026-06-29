@@ -1,3 +1,13 @@
+<!-- SORTIFY_DOWNLOAD_CLEANUP_STALE_REVIEW_ROLLBACK_INFO_START -->
+## vNext - Download cleanup stale review and rollback info
+
+- Added scan output `stale_review_candidates.tsv` for old-looking `pixel_local__*` helper artifacts.
+- Kept `pixel_local__*` protected/local-hold; stale-review is metadata only and is not archive-safe input.
+- Improved `rollback-info` to report latest run, manifest, rollback, archive and items paths.
+- Kept archive-safe explicit/manual only with no service, boot, watcher, watchdog or queue integration.
+- Kept no-runtime/no-host/no-route/no-SDD-marker and no-SHA-sidecar boundaries.
+<!-- SORTIFY_DOWNLOAD_CLEANUP_STALE_REVIEW_ROLLBACK_INFO_END -->
+
 <!-- SORTIFY_DOWNLOAD_CLEANUP_MAINTENANCE_VNEXT_CHANGELOG_START -->
 ## vNext - Download cleanup maintenance
 

@@ -2,186 +2,225 @@
 set -euo pipefail
 
 SOURCE="${SORTIFY_CLEANUP_SOURCE:-/storage/emulated/0/Download}"
-ARCHIVE_ROOT="${SORTIFY_CLEANUP_ARCHIVE_ROOT:-$SOURCE/pixel_local__sortify-archive}"
-WORK_ROOT="${SORTIFY_CLEANUP_WORK_ROOT:-$SOURCE/pixel_local__repo-helper-work/sortify-download-cleanup}"
+WORK_ROOT="${SORTIFY_CLEANUP_WORK_ROOT:-/storage/emulated/0/Download/pixel_local__repo-helper-work/sortify-download-cleanup}"
 RUN_ID="${SORTIFY_CLEANUP_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RUN_DIR="${SORTIFY_CLEANUP_RUN_DIR:-$WORK_ROOT/run_$RUN_ID}"
-LATEST_PATH="$WORK_ROOT/latest-run.path"
-mkdir -p "$WORK_ROOT"
+ARCHIVE_ROOT="${SORTIFY_CLEANUP_ARCHIVE_ROOT:-/storage/emulated/0/Download/pixel_local__sortify-archive}"
+ARCHIVE_DIR="${SORTIFY_CLEANUP_ARCHIVE_DIR:-$ARCHIVE_ROOT/archive_$RUN_ID}"
+ITEMS_DIR="$ARCHIVE_DIR/items"
 
-active_folder_name() {
-    case "$1" in
-        WhatsApp|Telegram|"Quick Share"|CHECK24|Nagram|Turrit|"WA Call Recordings"|WaEnhancerX|docs|files|fitbit) return 0 ;;
-    esac
-    return 1
+mkdir -p "$RUN_DIR"
+
+is_git_worktree() {
+  local p="$1"
+  [ -d "$p/.git" ]
 }
 
 protected_name() {
-    name="$1"
-    case "$name" in
-        ""|.*|.work|.pidd-quarantine|.00_live_slot.state|.zip) return 0 ;;
-        pixel_local__*|heimnetz__*|target-*__*|targets-*__*) return 0 ;;
-        pidd-smoke-hold*|pixel_local_hold*|*live*anchor*|*current*|*active*|*hold*) return 0 ;;
-    esac
-    active_folder_name "$name" && return 0
-    return 1
+  local name="$1" path="$2"
+  case "$name" in
+    .*) return 0 ;;
+    pixel_local__*) return 0 ;;
+    heimnetz__*) return 0 ;;
+    target-*__*) return 0 ;;
+    targets-*__*) return 0 ;;
+    .work|.pidd-quarantine|.00_live_slot.state|.zip) return 0 ;;
+    WhatsApp|Telegram|"Quick Share"|CHECK24|Nagram|Turrit|"WA Call Recordings"|WaEnhancerX|docs|files|fitbit) return 0 ;;
+    pidd-smoke-hold|pixel_local_hold*|*live*anchor*|*current*|*active*|*hold*) return 0 ;;
+  esac
+  if [ -d "$path" ] && is_git_worktree "$path"; then return 0; fi
+  return 1
+}
+
+stale_review_name() {
+  local name="$1" path="$2"
+  case "$name" in
+    pixel_local__repo-helper-work|pixel_local__sortify-archive) return 1 ;;
+    pixel_local__*rollback*|pixel_local__*backup*|pixel_local__*evidence*) return 1 ;;
+    pixel_local__*.zip|pixel_local__*.py|pixel_local__*.sh|pixel_local__*.md|pixel_local__*.txt|pixel_local__*.log) return 0 ;;
+  esac
+  return 1
 }
 
 review_name() {
-    case "$1" in
-        Redmi_Buds_6_Play_M2420E1_Wavelet_AutoEQ_estimated_profiles|TS-DoH-DoT-BypassBlock-V5_4_3|hhh|hhhb) return 0 ;;
-    esac
-    return 1
+  local name="$1"
+  case "$name" in
+    Redmi_Buds_6_Play_M2420E1_Wavelet_AutoEQ_estimated_profiles|TS-DoH-DoT-BypassBlock-V5_4_3|hhh|hhhb) return 0 ;;
+  esac
+  return 1
 }
 
 safe_name() {
-    name="$1"
+  local name="$1" path="$2"
+  case "$name" in
+    Sortify-Dispatch-v*.zip|ssh-drop-dispatcher-magisk-v*.zip|pixel-drop-dispatch*.zip) return 0 ;;
+    handover_*.md|mini_handover_*.md|magisk_install_log_*.log|pixel_thermal_*.txt) return 0 ;;
+    __pycache__) return 0 ;;
+    *.sha256) return 0 ;;
+  esac
+  if [ -d "$path" ]; then
     case "$name" in
-        Sortify-Dispatch-v*.zip|ssh-drop-dispatcher*.zip|pixel-drop-dispatch*.zip|mrt-dev*.zip|mrt-dev*.zip.sha256) return 0 ;;
-        handover_*.md|mini_handover_*.md|magisk_install_log_*.log|pixel_thermal_*.txt) return 0 ;;
-        __pycache__) return 0 ;;
+      *_20[0-9][0-9][0-9][0-9][0-9][0-9]*|run_20[0-9][0-9][0-9][0-9][0-9][0-9]*|release_*|evidence_*) return 0 ;;
     esac
-    return 1
+  fi
+  return 1
 }
 
-classify_entry() {
-    path="$1"
+classify_one() {
+  local path="$1" name
+  name="$(basename "$path")"
+  if protected_name "$name" "$path"; then printf '%s\tprotected\tprotected_name\t%s\n' "$name" "$path"; return 0; fi
+  if review_name "$name"; then printf '%s\treview\treview_policy_name\t%s\n' "$name" "$path"; return 0; fi
+  if safe_name "$name" "$path"; then printf '%s\tsafe\tsafe_policy_name\t%s\n' "$name" "$path"; return 0; fi
+  printf '%s\tprotected\tdefault_protect\t%s\n' "$name" "$path"
+}
+
+write_stale_review() {
+  local out="$1"
+  printf 'name\tclass\treason\tpath\n' > "$out"
+  find "$SOURCE" -mindepth 1 -maxdepth 1 -print 2>/dev/null | sort | while IFS= read -r path; do
+    [ -e "$path" ] || continue
+    local name
     name="$(basename "$path")"
-    if [ -d "$path/.git" ]; then printf '%s\tprotected\tgit_worktree\t%s\n' "$name" "$path"; return 0; fi
-    if protected_name "$name"; then printf '%s\tprotected\tprotected_name\t%s\n' "$name" "$path"; return 0; fi
-    if review_name "$name"; then printf '%s\treview\treview_policy_name\t%s\n' "$name" "$path"; return 0; fi
-    if safe_name "$name"; then printf '%s\tsafe\tsafe_policy_name\t%s\n' "$name" "$path"; return 0; fi
-    printf '%s\tprotected\tdefault_protect\t%s\n' "$name" "$path"
+    if stale_review_name "$name" "$path"; then
+      printf '%s\tstale_review\tpixel_local_review_only\t%s\n' "$name" "$path" >> "$out"
+    fi
+  done
 }
 
 scan_cmd() {
-    mkdir -p "$RUN_DIR"
-    printf '%s\n' "$RUN_DIR" > "$LATEST_PATH"
-    index="$RUN_DIR/index.tsv"
-    safe="$RUN_DIR/safe_candidates.tsv"
-    review="$RUN_DIR/review_candidates.tsv"
-    protected="$RUN_DIR/protected.tsv"
-    printf 'name\tclass\treason\tpath\n' > "$index"
-    printf 'name\tclass\treason\tpath\n' > "$safe"
-    printf 'name\tclass\treason\tpath\n' > "$review"
-    printf 'name\tclass\treason\tpath\n' > "$protected"
-    if [ -d "$SOURCE" ]; then
-        find "$SOURCE" -mindepth 1 -maxdepth 1 -print 2>/dev/null | sort | while IFS= read -r entry; do
-            line="$(classify_entry "$entry")"
-            printf '%s\n' "$line" >> "$index"
-            cls="$(printf '%s\n' "$line" | awk -F '\t' '{print $2}')"
-            case "$cls" in
-                safe) printf '%s\n' "$line" >> "$safe" ;;
-                review) printf '%s\n' "$line" >> "$review" ;;
-                *) printf '%s\n' "$line" >> "$protected" ;;
-            esac
-        done
-    fi
-    indexed=$(( $(wc -l < "$index") - 1 ))
-    safe_count=$(( $(wc -l < "$safe") - 1 ))
-    review_count=$(( $(wc -l < "$review") - 1 ))
-    protected_count=$(( $(wc -l < "$protected") - 1 ))
-    echo "== Sortify Download Cleanup Scan =="
-    echo "source=$SOURCE"
-    echo "run=$RUN_DIR"
-    echo "indexed=$indexed"
-    echo "safe=$safe_count"
-    echo "review=$review_count"
-    echo "protected=$protected_count"
-    echo "RESULT: SORTIFY_DOWNLOAD_SAFE_SCAN_DONE rc=0"
-}
-
-latest_run_dir() {
-    if [ -n "${SORTIFY_CLEANUP_RUN_DIR:-}" ]; then printf '%s\n' "$SORTIFY_CLEANUP_RUN_DIR"; return 0; fi
-    if [ -f "$LATEST_PATH" ]; then sed -n '1p' "$LATEST_PATH"; return 0; fi
-    echo "latest_run_missing" >&2
-    return 1
+  mkdir -p "$RUN_DIR"
+  : > "$RUN_DIR/index.tsv.tmp"
+  printf 'name\tclass\treason\tpath\n' > "$RUN_DIR/index.tsv.tmp"
+  find "$SOURCE" -mindepth 1 -maxdepth 1 -print 2>/dev/null | sort | while IFS= read -r path; do
+    [ -e "$path" ] || continue
+    classify_one "$path" >> "$RUN_DIR/index.tsv.tmp"
+  done
+  mv "$RUN_DIR/index.tsv.tmp" "$RUN_DIR/index.tsv"
+  awk -F '\t' 'NR==1 || $2=="safe"' "$RUN_DIR/index.tsv" > "$RUN_DIR/safe_candidates.tsv"
+  awk -F '\t' 'NR==1 || $2=="review"' "$RUN_DIR/index.tsv" > "$RUN_DIR/review_candidates.tsv"
+  awk -F '\t' 'NR==1 || $2=="protected"' "$RUN_DIR/index.tsv" > "$RUN_DIR/protected.tsv"
+  write_stale_review "$RUN_DIR/stale_review_candidates.tsv"
+  indexed=$(( $(wc -l < "$RUN_DIR/index.tsv") - 1 ))
+  safe=$(( $(wc -l < "$RUN_DIR/safe_candidates.tsv") - 1 ))
+  review=$(( $(wc -l < "$RUN_DIR/review_candidates.tsv") - 1 ))
+  protected=$(( $(wc -l < "$RUN_DIR/protected.tsv") - 1 ))
+  stale_review=$(( $(wc -l < "$RUN_DIR/stale_review_candidates.tsv") - 1 ))
+  echo "== Sortify Download Cleanup Scan =="
+  echo "source=$SOURCE"
+  echo "run=$RUN_DIR"
+  echo "indexed=$indexed"
+  echo "safe=$safe"
+  echo "review=$review"
+  echo "protected=$protected"
+  echo "stale_review=$stale_review"
+  echo "RESULT: SORTIFY_DOWNLOAD_SAFE_SCAN_DONE rc=0"
 }
 
 guard_cmd() {
-    run="$(latest_run_dir)"
-    safe="$run/safe_candidates.tsv"
-    test -f "$safe"
-    suspicious="$run/suspicious_safe.tsv"
-    awk -F '\t' 'NR>1 {print $1}' "$safe" | grep -E '^(\.|pixel_local__|heimnetz__|target-|targets-)|(^|.*)(work|live|active|current|state|slot|quarantine|pidd|dispatch|hold)(.*)$|^(WhatsApp|Telegram|Quick Share|CHECK24|Nagram|Turrit|WA Call Recordings|WaEnhancerX|docs|files|fitbit)$' > "$suspicious" || true
-    echo "== suspicious inside safe list =="
-    if [ -s "$suspicious" ]; then
-        cat "$suspicious"
-        echo "RESULT: SORTIFY_SAFE_LIST_GUARD_FAIL rc=1"
-        return 1
-    fi
-    : > "$run/guard.pass"
-    echo "RESULT: SORTIFY_SAFE_LIST_GUARD_DONE rc=0"
+  test -f "$RUN_DIR/safe_candidates.tsv"
+  echo "== suspicious inside safe list =="
+  awk -F '\t' 'NR>1 {print $1}' "$RUN_DIR/safe_candidates.tsv" | grep -E '^(\.|pixel_local__|heimnetz__|target-|targets-)|work|live|active|current|state|slot|quarantine|pidd|dispatch|hold|WhatsApp|Telegram|Quick Share|CHECK24|Nagram|Turrit|WA Call Recordings|WaEnhancerX|docs|files|fitbit' > "$RUN_DIR/guard_suspicious.txt" || true
+  if [ -s "$RUN_DIR/guard_suspicious.txt" ]; then
+    cat "$RUN_DIR/guard_suspicious.txt"
+    echo "RESULT: SORTIFY_SAFE_LIST_GUARD_FAIL rc=1"
+    exit 1
+  fi
+  date +%s > "$RUN_DIR/guard.pass"
+  echo "RESULT: SORTIFY_SAFE_LIST_GUARD_DONE rc=0"
 }
 
 archive_safe_cmd() {
-    run="$(latest_run_dir)"
-    safe="$run/safe_candidates.tsv"
-    guard="$run/guard.pass"
-    test -f "$safe"
-    test -f "$guard"
-    archive="$ARCHIVE_ROOT/archive_$RUN_ID"
-    items="$archive/items"
-    manifest="$run/archive_manifest.tsv"
-    rollback="$run/rollback_$RUN_ID.sh"
-    mkdir -p "$items"
-    printf 'original_path\tarchive_path\tname\n' > "$manifest"
-    awk -F '\t' 'NR>1 {print $1 "\t" $4}' "$safe" | while IFS=$(printf '\t') read -r name path; do
-        [ -e "$path" ] || continue
-        dest="$items/$name"
-        if [ -e "$dest" ]; then dest="$items/${name}.$(date +%s)"; fi
-        mv "$path" "$dest"
-        printf '%s\t%s\t%s\n' "$path" "$dest" "$name" >> "$manifest"
-    done
-    printf '%s\n' '#!/usr/bin/env bash' > "$rollback"
-    printf '%s\n' 'set -euo pipefail' >> "$rollback"
-    printf '%s\n' 'manifest="${1:-archive_manifest.tsv}"' >> "$rollback"
-    printf '%s\n' 'awk -F "\t" '\''NR>1 {print $1 "\t" $2}'\'' "$manifest" | while IFS=$(printf "\t") read -r src dst; do mkdir -p "$(dirname "$src")"; if [ -e "$dst" ] && [ ! -e "$src" ]; then mv "$dst" "$src"; fi; done' >> "$rollback"
-    chmod 0755 "$rollback"
-    echo "archive=$archive"
-    echo "items=$items"
-    echo "run=$run"
-    echo "manifest=$manifest"
-    echo "rollback=$rollback"
-    echo "RESULT: SORTIFY_DOWNLOAD_ARCHIVE_SAFE_DONE rc=0"
+  test -f "$RUN_DIR/safe_candidates.tsv"
+  test -f "$RUN_DIR/guard.pass"
+  mkdir -p "$ITEMS_DIR"
+  local manifest="$RUN_DIR/archive_manifest.tsv" rollback="$RUN_DIR/rollback_$RUN_ID.sh"
+  printf 'name\tsource\tdestination\n' > "$manifest"
+  awk -F '\t' 'NR>1 {print $1 "\t" $4}' "$RUN_DIR/safe_candidates.tsv" | while IFS="$(printf '\t')" read -r name source_path; do
+    [ -n "$name" ] || continue
+    [ -e "$source_path" ] || continue
+    dest="$ITEMS_DIR/$name"
+    if [ -e "$dest" ]; then
+      echo "archive_dest_exists=$dest"
+      exit 30
+    fi
+    mv "$source_path" "$dest"
+    printf '%s\t%s\t%s\n' "$name" "$source_path" "$dest" >> "$manifest"
+  done
+  {
+    echo '#!/usr/bin/env bash'
+    echo 'set -euo pipefail'
+    echo 'manifest="'"$manifest"'"'
+    echo 'tail -n +2 "$manifest" | while IFS="$(printf '\''\\t'\'')" read -r name source destination; do'
+    echo '  [ -n "$name" ] || continue'
+    echo '  if [ -e "$source" ]; then echo "restore_skip_source_exists=$source"; continue; fi'
+    echo '  mkdir -p "$(dirname "$source")"'
+    echo '  mv "$destination" "$source"'
+    echo '  echo "restored=$source"'
+    echo 'done'
+  } > "$rollback"
+  chmod 0755 "$rollback"
+  echo "archive=$ARCHIVE_DIR"
+  echo "items=$ITEMS_DIR"
+  echo "run=$RUN_DIR"
+  echo "manifest=$manifest"
+  echo "rollback=$rollback"
+  echo "RESULT: SORTIFY_DOWNLOAD_ARCHIVE_SAFE_DONE rc=0"
 }
 
 verify_cmd() {
-    run="$(latest_run_dir)"
-    manifest="$run/archive_manifest.tsv"
-    rollback="$(find "$run" -maxdepth 1 -name 'rollback_*.sh' | sort | tail -1)"
-    test -f "$manifest"
-    test -f "$rollback"
-    bash -n "$rollback"
-    archive="$(awk -F '\t' 'NR==2 {print $2}' "$manifest" | sed 's#/items/.*##')"
-    items="$archive/items"
-    test -d "$archive"
-    test -d "$items"
-    moved=$(( $(wc -l < "$manifest") - 1 ))
-    top_level_items="$(find "$items" -mindepth 1 -maxdepth 1 -print 2>/dev/null | wc -l | tr -d ' ')"
-    echo "PASS: archive dir present"
-    echo "PASS: items dir present"
-    echo "PASS: manifest present"
-    echo "PASS: rollback present"
-    echo "top_level_items=$top_level_items"
-    echo "manifest_lines=$(wc -l < "$manifest")"
-    test "$top_level_items" = "$moved"
-    echo "RESULT: SORTIFY_ARCHIVE_SAFE_FINAL_VERIFY_DONE rc=0"
+  local manifest="$RUN_DIR/archive_manifest.tsv" rollback
+  rollback="$(find "$RUN_DIR" -maxdepth 1 -name 'rollback_*.sh' | sort | tail -1 || true)"
+  test -d "$ARCHIVE_DIR" && echo "PASS: archive dir present"
+  test -d "$ITEMS_DIR" && echo "PASS: items dir present"
+  test -f "$manifest" && echo "PASS: manifest present"
+  test -n "$rollback" && test -f "$rollback" && echo "PASS: rollback present"
+  bash -n "$rollback"
+  top_level_items="$(find "$ITEMS_DIR" -mindepth 1 -maxdepth 1 -print 2>/dev/null | wc -l | tr -d ' ')"
+  manifest_lines="$(wc -l < "$manifest" | tr -d ' ')"
+  echo "top_level_items=$top_level_items"
+  echo "manifest_lines=$manifest_lines"
+  if [ "$manifest_lines" -ne $(( top_level_items + 1 )) ]; then
+    echo "RESULT: SORTIFY_ARCHIVE_SAFE_FINAL_VERIFY_FAIL rc=1"
+    exit 1
+  fi
+  echo "RESULT: SORTIFY_ARCHIVE_SAFE_FINAL_VERIFY_DONE rc=0"
 }
 
 rollback_info_cmd() {
-    run="$(latest_run_dir)"
-    echo "run=$run"
-    find "$run" -maxdepth 1 -name 'rollback_*.sh' -print | sort | tail -1 | sed 's/^/rollback=/'
-    test -f "$run/archive_manifest.tsv" && echo "manifest=$run/archive_manifest.tsv"
-    echo "RESULT: SORTIFY_DOWNLOAD_CLEANUP_ROLLBACK_INFO_DONE rc=0"
+  local run="$RUN_DIR"
+  if [ ! -d "$run" ]; then
+    run="$(find "$WORK_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'run_*' 2>/dev/null | sort | tail -1 || true)"
+  fi
+  if [ -z "$run" ] || [ ! -d "$run" ]; then
+    echo "rollback_info=none"
+    echo "RESULT: SORTIFY_DOWNLOAD_ROLLBACK_INFO_DONE rc=0"
+    return 0
+  fi
+  local manifest rollback archive items
+  manifest="$run/archive_manifest.tsv"
+  rollback="$(find "$run" -maxdepth 1 -name 'rollback_*.sh' | sort | tail -1 || true)"
+  archive=""
+  items=""
+  if [ -f "$manifest" ]; then
+    items="$(awk -F '\t' 'NR==2 {print $3}' "$manifest" | sed 's#/items/.*#/items#')"
+    archive="$(dirname "$items")"
+  fi
+  echo "run=$run"
+  echo "manifest=$manifest"
+  echo "rollback=$rollback"
+  echo "archive=$archive"
+  echo "items=$items"
+  if [ -f "$manifest" ]; then echo "manifest_lines=$(wc -l < "$manifest" | tr -d ' ')"; fi
+  if [ -n "$rollback" ] && [ -f "$rollback" ]; then bash -n "$rollback" && echo "rollback_syntax=PASS"; fi
+  echo "RESULT: SORTIFY_DOWNLOAD_ROLLBACK_INFO_DONE rc=0"
 }
 
 case "${1:-}" in
-    scan) scan_cmd ;;
-    guard) guard_cmd ;;
-    archive-safe) archive_safe_cmd ;;
-    verify) verify_cmd ;;
-    rollback-info) rollback_info_cmd ;;
-    *) echo "Usage: sortify-download-cleanup.sh scan|guard|archive-safe|verify|rollback-info"; exit 2 ;;
+  scan) scan_cmd ;;
+  guard) guard_cmd ;;
+  archive-safe) archive_safe_cmd ;;
+  verify) verify_cmd ;;
+  rollback-info) rollback_info_cmd ;;
+  *) echo "Usage: sortify-download-cleanup.sh scan|guard|archive-safe|verify|rollback-info"; exit 2 ;;
 esac
