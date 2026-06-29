@@ -1,3 +1,13 @@
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_CHANGELOG_START -->
+## vNext - Archive-review-approved dry-run
+
+- Added planning-only `archive-review-approved dry-run` for stale-review approval previews.
+- Requires exact run id plus `SORTIFY_CLEANUP_APPROVED_FOR_ARCHIVE=yes`.
+- Allows only A/C candidates and blocks B/D/E, missing sources and duplicate destinations.
+- Writes `planned_review_archive_manifest.tsv` without moving files.
+- Kept no-runtime/no-release/no-host/no-route/no-SDD-marker/no-SHA-sidecar boundaries.
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_CHANGELOG_END -->
+
 <!-- SORTIFY_DOWNLOAD_CLEANUP_STALE_REVIEW_ROLLBACK_INFO_START -->
 ## vNext - Download cleanup stale review and rollback info
 

@@ -1,3 +1,9 @@
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_README_START -->
+## vNext: archive-review-approved dry-run
+
+Sortify Download cleanup now has a planning-only `archive-review-approved dry-run` command. It requires an explicit run id and `SORTIFY_CLEANUP_APPROVED_FOR_ARCHIVE=yes`, reads the approval preview, accepts only A/C review candidates, blocks B/D/E, and writes only `planned_review_archive_manifest.tsv`. It does not move files.
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_README_END -->
+
 <!-- SORTIFY_DOWNLOAD_CLEANUP_STALE_REVIEW_ROLLBACK_INFO_START -->
 ## vNext: Download cleanup stale review and rollback info
 
