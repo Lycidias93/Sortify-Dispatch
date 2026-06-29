@@ -1,3 +1,20 @@
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_DOCS_START -->
+### vNext: archive-review-approved apply and verify-review-archive
+
+`archive-review-approved apply` performs the manual archive action for an already generated review plan. It is intentionally separate from dry-run.
+
+Hard gates:
+- Requires an exact `SORTIFY_CLEANUP_RUN_ID` or `SORTIFY_CLEANUP_RUN_DIR`.
+- Requires `SORTIFY_CLEANUP_APPLY_REVIEW_ARCHIVE=yes`.
+- Reads `planned_review_archive_manifest.tsv` or `SORTIFY_CLEANUP_PLANNED_MANIFEST`.
+- Accepts only planned rows from buckets `A_temp_helper_scripts` and `C_logs_boot_watch_thermal_txt`.
+- Blocks B/D/E buckets, invalid decisions, missing source files, duplicate destinations and destination scope drift.
+- Writes `archive_review_manifest.tsv`.
+- Writes `rollback_review_archive_<run_id>.sh`.
+- `verify-review-archive` checks planned count, manifest count, archive item count, rollback syntax, bucket validity, missing destinations and source absence.
+- Safety boundary for this feature: runtime_install=no, release_create=no, archive_safe=no, host_run=no, sdd_marker_write=no, dns_ha_vip_route_change=no, sha_sidecar=no.
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_DOCS_END -->
+
 <!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_DOCS_START -->
 ### vNext: archive-review-approved dry-run
 

@@ -296,6 +296,176 @@ archive_review_approved_dry_run_cmd() {
   echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_DONE rc=0"
 }
 
+archive_review_approved_apply_cmd() {
+  if [ -z "${SORTIFY_CLEANUP_RUN_ID:-}" ] && [ -z "${SORTIFY_CLEANUP_RUN_DIR:-}" ]; then
+    echo "archive_review_exact_run=FAIL"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=41"
+    exit 41
+  fi
+  if [ "${SORTIFY_CLEANUP_APPLY_REVIEW_ARCHIVE:-no}" != "yes" ]; then
+    echo "apply_review_archive=no"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_REQUIRED rc=42"
+    exit 42
+  fi
+
+  local planned="${SORTIFY_CLEANUP_PLANNED_MANIFEST:-$RUN_DIR/planned_review_archive_manifest.tsv}"
+  local review_archive="${SORTIFY_CLEANUP_REVIEW_ARCHIVE_DIR:-$ARCHIVE_ROOT/review_archive_$RUN_ID}"
+  local review_items="$review_archive/items"
+  local manifest="$RUN_DIR/archive_review_manifest.tsv"
+  local rollback="$RUN_DIR/rollback_review_archive_$RUN_ID.sh"
+  local invalid="$RUN_DIR/archive_review_apply_invalid.tsv"
+  local missing="$RUN_DIR/archive_review_apply_missing.tsv"
+  local dupes="$RUN_DIR/archive_review_apply_duplicate_destinations.tsv"
+  local dest_exists="$RUN_DIR/archive_review_apply_destination_exists.tsv"
+  local tmp="$manifest.tmp"
+
+  test -f "$planned"
+  awk -F '	' 'NR==1 && $1=="name" && $2=="source" && $3=="destination" && $4=="bucket" && $5=="decision" {ok=1} END {exit ok ? 0 : 1}' "$planned"
+
+  awk -F '	' 'NR>1 && ($4!="A_temp_helper_scripts" && $4!="C_logs_boot_watch_thermal_txt") {print}' "$planned" > "$invalid"
+  if [ -s "$invalid" ]; then
+    echo "archive_review_apply_invalid_bucket=FAIL"
+    cat "$invalid"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=43"
+    exit 43
+  fi
+
+  awk -F '	' 'NR>1 && $5!="candidate_for_manual_archive_review" {print}' "$planned" >> "$invalid"
+  if [ -s "$invalid" ]; then
+    echo "archive_review_apply_invalid_decision=FAIL"
+    cat "$invalid"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=44"
+    exit 44
+  fi
+
+  : > "$missing"
+  tail -n +2 "$planned" | while IFS="$(printf '	')" read -r name source destination bucket decision; do
+    [ -n "$name" ] || continue
+    if [ ! -e "$source" ]; then
+      printf '%s	%s\n' "$name" "$source" >> "$missing"
+    fi
+  done
+  if [ -s "$missing" ]; then
+    echo "archive_review_apply_missing_sources=FAIL"
+    cat "$missing"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=45"
+    exit 45
+  fi
+
+  awk -F '	' 'NR>1 {c[$3]++; if (c[$3] == 2) print $3}' "$planned" > "$dupes"
+  if [ -s "$dupes" ]; then
+    echo "archive_review_apply_duplicate_destinations=FAIL"
+    cat "$dupes"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=46"
+    exit 46
+  fi
+
+  : > "$dest_exists"
+  tail -n +2 "$planned" | while IFS="$(printf '	')" read -r name source destination bucket decision; do
+    [ -n "$name" ] || continue
+    case "$destination" in "$review_items"/*) ;;
+      *)
+        printf '%s	%s\n' "$name" "$destination" >> "$invalid"
+        continue
+        ;;
+    esac
+    if [ -e "$destination" ]; then
+      printf '%s	%s\n' "$name" "$destination" >> "$dest_exists"
+    fi
+  done
+  if [ -s "$invalid" ]; then
+    echo "archive_review_apply_destination_scope=FAIL"
+    cat "$invalid"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=47"
+    exit 47
+  fi
+  if [ -s "$dest_exists" ]; then
+    echo "archive_review_apply_destination_exists=FAIL"
+    cat "$dest_exists"
+    echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_FAIL rc=48"
+    exit 48
+  fi
+
+  mkdir -p "$review_items"
+  printf 'name	source	destination	bucket	decision\n' > "$tmp"
+
+  tail -n +2 "$planned" | while IFS="$(printf '	')" read -r name source destination bucket decision; do
+    [ -n "$name" ] || continue
+    mkdir -p "$(dirname "$destination")"
+    mv "$source" "$destination"
+    printf '%s	%s	%s	%s	%s\n' "$name" "$source" "$destination" "$bucket" "$decision" >> "$tmp"
+  done
+
+  mv "$tmp" "$manifest"
+
+  {
+    echo '#!/usr/bin/env bash'
+    echo 'set -euo pipefail'
+    echo 'manifest="'"$manifest"'"'
+    echo 'tail -n +2 "$manifest" | while IFS="$(printf '\''\\t'\'')" read -r name source destination bucket decision; do'
+    echo '  [ -n "$name" ] || continue'
+    echo '  if [ -e "$source" ]; then echo "restore_skip_source_exists=$source"; continue; fi'
+    echo '  if [ ! -e "$destination" ]; then echo "restore_missing_destination=$destination"; exit 52; fi'
+    echo '  mkdir -p "$(dirname "$source")"'
+    echo '  mv "$destination" "$source"'
+    echo '  echo "restored=$source"'
+    echo 'done'
+  } > "$rollback"
+  chmod 0755 "$rollback"
+
+  moved_count=$(( $(wc -l < "$manifest") - 1 ))
+  echo "archive_review_mode=apply"
+  echo "apply_review_archive=yes"
+  echo "run=$RUN_DIR"
+  echo "planned_manifest=$planned"
+  echo "manifest=$manifest"
+  echo "rollback=$rollback"
+  echo "archive=$review_archive"
+  echo "items=$review_items"
+  echo "moved_items=$moved_count"
+  echo "archive_safe=no"
+  echo "file_move=yes_review_apply"
+  echo "RESULT: SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_DONE rc=0"
+}
+
+verify_review_archive_cmd() {
+  local planned="${SORTIFY_CLEANUP_PLANNED_MANIFEST:-$RUN_DIR/planned_review_archive_manifest.tsv}"
+  local review_archive="${SORTIFY_CLEANUP_REVIEW_ARCHIVE_DIR:-$ARCHIVE_ROOT/review_archive_$RUN_ID}"
+  local review_items="$review_archive/items"
+  local manifest="$RUN_DIR/archive_review_manifest.tsv"
+  local rollback="$RUN_DIR/rollback_review_archive_$RUN_ID.sh"
+
+  test -f "$planned"
+  test -f "$manifest"
+  test -f "$rollback"
+  test -d "$review_items"
+  bash -n "$rollback"
+
+  planned_items=$(( $(wc -l < "$planned") - 1 ))
+  manifest_items=$(( $(wc -l < "$manifest") - 1 ))
+  archive_items="$(find "$review_items" -mindepth 1 -maxdepth 1 -print 2>/dev/null | wc -l | tr -d ' ')"
+  bad_bucket_count="$(awk -F '	' 'NR>1 && $4!="A_temp_helper_scripts" && $4!="C_logs_boot_watch_thermal_txt" {c++} END {print c+0}' "$manifest")"
+  source_still_present="$(awk -F '	' 'NR>1 {print $2}' "$manifest" | while IFS= read -r p; do [ ! -e "$p" ] || echo "$p"; done | wc -l | tr -d ' ')"
+  dest_missing="$(awk -F '	' 'NR>1 {print $3}' "$manifest" | while IFS= read -r p; do [ -e "$p" ] || echo "$p"; done | wc -l | tr -d ' ')"
+
+  echo "planned_items=$planned_items"
+  echo "manifest_items=$manifest_items"
+  echo "archive_items=$archive_items"
+  echo "bad_bucket_count=$bad_bucket_count"
+  echo "source_still_present=$source_still_present"
+  echo "dest_missing=$dest_missing"
+  echo "rollback=$rollback"
+  echo "rollback_syntax=PASS"
+
+  if [ "$planned_items" -ne "$manifest_items" ]; then echo "RESULT: SORTIFY_VERIFY_REVIEW_ARCHIVE_FAIL rc=1"; exit 1; fi
+  if [ "$manifest_items" -ne "$archive_items" ]; then echo "RESULT: SORTIFY_VERIFY_REVIEW_ARCHIVE_FAIL rc=1"; exit 1; fi
+  if [ "$bad_bucket_count" -ne 0 ]; then echo "RESULT: SORTIFY_VERIFY_REVIEW_ARCHIVE_FAIL rc=1"; exit 1; fi
+  if [ "$source_still_present" -ne 0 ]; then echo "RESULT: SORTIFY_VERIFY_REVIEW_ARCHIVE_FAIL rc=1"; exit 1; fi
+  if [ "$dest_missing" -ne 0 ]; then echo "RESULT: SORTIFY_VERIFY_REVIEW_ARCHIVE_FAIL rc=1"; exit 1; fi
+
+  echo "RESULT: SORTIFY_VERIFY_REVIEW_ARCHIVE_DONE rc=0"
+}
+
 case "${1:-}" in
   scan) scan_cmd ;;
   guard) guard_cmd ;;
@@ -305,8 +475,10 @@ case "${1:-}" in
   archive-review-approved)
     case "${2:-}" in
       dry-run) archive_review_approved_dry_run_cmd ;;
-      *) echo "Usage: sortify-download-cleanup.sh archive-review-approved dry-run"; exit 2 ;;
+      apply) archive_review_approved_apply_cmd ;;
+      *) echo "Usage: sortify-download-cleanup.sh archive-review-approved dry-run|apply"; exit 2 ;;
     esac
     ;;
-  *) echo "Usage: sortify-download-cleanup.sh scan|guard|archive-safe|verify|rollback-info|archive-review-approved dry-run"; exit 2 ;;
+  verify-review-archive) verify_review_archive_cmd ;;
+  *) echo "Usage: sortify-download-cleanup.sh scan|guard|archive-safe|verify|rollback-info|archive-review-approved dry-run|apply|verify-review-archive"; exit 2 ;;
 esac
