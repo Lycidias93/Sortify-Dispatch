@@ -1,3 +1,15 @@
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_CHANGELOG_START -->
+## vNext - Archive-review-approved apply
+
+- Added gated `archive-review-approved apply` for already planned review archives.
+- Added `verify-review-archive` for post-apply validation.
+- Requires exact run id plus `SORTIFY_CLEANUP_APPLY_REVIEW_ARCHIVE=yes`.
+- Moves only rows from `planned_review_archive_manifest.tsv` with A/C buckets.
+- Writes `archive_review_manifest.tsv` and `rollback_review_archive_<run_id>.sh`.
+- Fixture coverage: apply required, apply success, verify success and rollback syntax.
+- Kept no-runtime/no-release/no-host/no-route/no-SDD-marker/no-SHA-sidecar boundaries.
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_CHANGELOG_END -->
+
 <!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_CHANGELOG_START -->
 ## vNext - Archive-review-approved dry-run
 

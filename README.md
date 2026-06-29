@@ -1,3 +1,9 @@
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_README_START -->
+## vNext: archive-review-approved apply
+
+Sortify Download cleanup now has a separate `archive-review-approved apply` command for manually applying a previously verified review archive plan. It requires `SORTIFY_CLEANUP_APPLY_REVIEW_ARCHIVE=yes`, an exact run id/run dir, and a valid `planned_review_archive_manifest.tsv`. It writes `archive_review_manifest.tsv` and `rollback_review_archive_<run_id>.sh`. `verify-review-archive` validates the result.
+<!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_README_END -->
+
 <!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_DRY_RUN_README_START -->
 ## vNext: archive-review-approved dry-run
 
