@@ -1,3 +1,13 @@
+<!-- CHANGELOG_SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_START -->
+## 4.7.0-download-cleanup-integration - Download Cleanup Integration
+
+- Released the vNext Download Cleanup integration as `v4.7.0-download-cleanup-integration` / `versionCode=24`.
+- Bundled explicit maintenance commands, stale-review planning, dry-run planning, gated apply, verify and rollback anchors.
+- Verified the real archive-review apply before release: `planned_items=233`, `moved_items=233`, `archive_items=233`, `source_still_present=0`, `dest_missing=0`, `top_level_delta=PASS`.
+- Preserved boundaries: no service/boot/watcher/queue cleanup automation, no runtime install in this workflow, no SSH/host-run, no SDD marker writes, no DNS/HA/VIP/route changes and no SHA sidecar.
+- Result marker: `RESULT: SORTIFY_V470_DOWNLOAD_CLEANUP_INTEGRATION_RELEASED rc=0`.
+<!-- CHANGELOG_SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_END -->
+
 <!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_CHANGELOG_START -->
 ## vNext - Archive-review-approved apply
 

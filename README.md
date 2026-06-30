@@ -1,3 +1,15 @@
+<!-- SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_START -->
+## Sortify Dispatch v4.7.0-download-cleanup-integration
+
+Release: `4.7.0-download-cleanup-integration` / `versionCode=24`.
+
+This release bundles the Download Cleanup maintenance integration: explicit scan/guard/archive-safe/verify/rollback-info, stale-review planning, `archive-review-approved dry-run`, gated `archive-review-approved apply`, and `verify-review-archive`.
+
+The release is based on the verified real workflow for `run_20260629_161212_stale_readonly`: `planned_items=233`, `moved_items=233`, `archive_items=233`, `source_still_present=0`, `dest_missing=0`, `top_level_delta=PASS`.
+
+Boundaries: no service/boot/watcher/queue cleanup automation, no runtime install in the release workflow, no SSH/host-run, no SDD marker writes, no DNS/HA/VIP/route changes, and no `.sha256` sidecar.
+<!-- SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_END -->
+
 <!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_README_START -->
 ## vNext: archive-review-approved apply
 
@@ -161,7 +173,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.6.5-sort-mode-control
+**Version:** 4.7.0-download-cleanup-integration
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -202,7 +214,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-v4.4-ssh-drop-dispatcher.zip` from Releases.
+1. Download `Sortify-Dispatch-v4.7.0-download-cleanup-integration.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.
