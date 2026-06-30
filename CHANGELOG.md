@@ -1,3 +1,12 @@
+<!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_CHANGELOG_START -->
+## 4.7.1-webui-cleanup-hotfix - WebUI cleanup/status hotfix
+
+- Fixed stale `4.6.5-sort-mode-control` status strings in action output and config export metadata.
+- Added guarded WebUI controls for Download Cleanup maintenance and review archive workflows.
+- Added `action.sh` cleanup wrappers for status, scan, guard, archive-safe, verify, rollback-info, review dry-run, review apply and review verify.
+- Preserved safety boundaries: `runtime_install=no`, `new_real_file_move=no`, `host_run=no`, `sdd_marker_write=no`, `dns_ha_vip_route_change=no`, `sha_sidecar=no`.
+<!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_CHANGELOG_END -->
+
 <!-- CHANGELOG_SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_START -->
 ## 4.7.0-download-cleanup-integration - Download Cleanup Integration
 
