@@ -115,6 +115,34 @@ def release_body_items(body):
             items.append(item)
     return items
 
+
+def important_prerelease_items(items, limit=2):
+    """Pick only end-user relevant prerelease changes/features/fixes."""
+    positive = re.compile(
+        r"(add|adds|added|enable|enables|enabled|support|supports|supported|fix|fixes|fixed|"
+        r"improve|improves|improved|preserve|preserves|preserved|keep|keeps|kept|restore|restores|"
+        r"restored|prevent|prevents|prevented|fallback|use-last|saved settings|setting|settings|"
+        r"outdoor|profile|zram|thermal|battery|boot|runtime)", re.I)
+    noise = re.compile(
+        r"(verified|verification|android |pixel 10|mustang|credits?|harish|codecity|joshua|sha256|"
+        r"artifact|download|install command|tombstone|tensorconservative|research-only|blocked:|"
+        r"commit|cherry-pick|mockup|audit|docs?|read-only helper|active\.?$|pass\.?$|^no |^final verified)", re.I)
+    shouting = re.compile(r"^[A-Z0-9_ ./-]{18,}$")
+    out=[]; seen=set()
+    for raw in items or []:
+        item=clean_line(str(raw))[:180]
+        if not item or len(item)<8 or noise.search(item):
+            continue
+        if shouting.match(item) and item.upper()==item:
+            continue
+        if not positive.search(item):
+            continue
+        key=item.lower()
+        if key not in seen:
+            seen.add(key); out.append(item)
+        if len(out)>=limit: return out
+    return out
+
 def previous_public_release(release):
     try:
         releases = gh_json(f"/repos/{REPO}/releases?per_page=100")
@@ -207,13 +235,19 @@ def build_messages(release):
     ]
     if title and title != tag:
         header.append(f"{kind}: {html.escape(tag)}")
-    if prerelease:
-        link = f'<a href="{html.escape(url)}">Open GitHub Pre-release</a>'
-        return ["\n\n".join(header + [link])]
     previous = previous_public_release(release)
     prev_tag = previous.get("tag_name") if previous else ""
-    since = f"since {prev_tag}" if prev_tag else "since the previous public release"
     bullets = release_body_items(release.get("body") or "")
+    if prerelease:
+        pre_items = important_prerelease_items(bullets, limit=2)
+        if not pre_items:
+            pre_items = important_prerelease_items(compare_commit_bullets(prev_tag, tag), limit=2)
+        link = f'<a href="{html.escape(url)}">Open GitHub Pre-release</a>'
+        if pre_items:
+            lines = [f"• {html.escape(item)}" for item in pre_items]
+            return ["\n\n".join(header + ["<b>Important changes</b>"] + lines + [link])]
+        return ["\n\n".join(header + [link])]
+    since = f"since {prev_tag}" if prev_tag else "since the previous public release"
     if not bullets:
         bullets = compare_commit_bullets(prev_tag, tag)
     if not bullets:
@@ -243,7 +277,7 @@ def selftest():
         "name": "New Release v9.9.9-test.1",
         "html_url": "https://github.com/Lycidias93/example/releases/tag/v9.9.9-test.1",
         "prerelease": True,
-        "body": "Highlights:\n• this prerelease detail must not be posted",
+        "body": "Verified:\n• Pixel 10 Pro XL / mustang\nHighlights:\n• Preserves Use-last settings fallback.\n• Adds Outdoor profile support.\n• Credits Somebody",
     }
     stable = {
         "tag_name": "v9.9.9",
@@ -255,13 +289,18 @@ def selftest():
     pre_msg = build_messages(pre)[0]
     stable_msg = "\n---\n".join(build_messages(stable))
     assert "Open GitHub Pre-release" in pre_msg
+    assert "Important changes" in pre_msg
+    assert "Preserves Use-last settings fallback" in pre_msg
+    assert "Adds Outdoor profile support" in pre_msg
+    assert "Pixel 10 Pro XL" not in pre_msg
+    assert "Credits Somebody" not in pre_msg
     assert "Changelog" not in pre_msg
-    assert "this prerelease detail" not in pre_msg
     assert "stable changelog line must be posted" in stable_msg
     assert "verified detail must be posted" in stable_msg
     assert "225013f7" not in stable_msg
     assert "file.zip" not in stable_msg
-    log("PASS: pre_short_no_changelog")
+    log("PASS: pre_minimal_important_changelog")
+    log("PASS: pre_noise_filtered")
     log("PASS: stable_full_changelog")
     log("PASS: artifact_noise_filtered")
     log("== prerelease preview ==")
