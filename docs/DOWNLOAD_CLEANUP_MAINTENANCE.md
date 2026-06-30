@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_DOC_START -->
+## Release integration: v4.7.0-download-cleanup-integration
+
+The Download Cleanup maintenance flow is released in Sortify Dispatch `v4.7.0-download-cleanup-integration` / `versionCode=24`. The public integration includes manual maintenance, stale-review planning, dry-run planning, gated apply, post-apply verify and rollback anchor generation.
+
+The real proof used for release integration was `run_20260629_161212_stale_readonly` with `planned_items=233`, `moved_items=233`, `archive_items=233`, `source_still_present=0`, `dest_missing=0`, and `top_level_delta=PASS`.
+
+This does not add service, boot, watcher, watchdog or queue automation. Real apply remains operator-triggered and gated.
+<!-- SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_DOC_END -->
+
 <!-- SORTIFY_ARCHIVE_REVIEW_APPROVED_APPLY_DOCS_START -->
 ### vNext: archive-review-approved apply and verify-review-archive
 

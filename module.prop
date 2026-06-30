@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.6.5-sort-mode-control
-versionCode=23
+version=4.7.0-download-cleanup-integration
+versionCode=24
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch v4.6.5: sort mode control for interval/manual/boot_once plus bounded preview sort.
+description=Sortify Dispatch v4.7.0: Download cleanup integration with stale-review, dry-run, gated apply, verify and rollback anchors.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
