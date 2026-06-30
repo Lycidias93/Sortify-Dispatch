@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Sortify Dispatch 4.6.5-sort-mode-control - Manual Action / Guard Tools
+# Sortify Dispatch 4.7.1-webui-cleanup-hotfix - Manual Action / Guard Tools
 
 ui_print() {
     echo "$1"
@@ -356,7 +356,7 @@ guard_status_raw() {
     find_misplaced_protected > "$tmp_misplaced" || true
     find_protected_under "$DEST_BASE/GuardConflicts" > "$tmp_conflicts" || true
     download_count="$(count_lines < "$tmp_download")"; misplaced_count="$(count_lines < "$tmp_misplaced")"; conflict_count="$(count_lines < "$tmp_conflicts")"
-    echo "== Sortify Dispatch Guard Status =="; echo "version=4.6.5-sort-mode-control"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
+    echo "== Sortify Dispatch Guard Status =="; echo "version=4.7.1-webui-cleanup-hotfix"; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "protected_in_download=$download_count"; echo "protected_misplaced=$misplaced_count"; echo "protected_conflicts=$conflict_count"; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"
     if [ "$misplaced_count" = "0" ]; then echo "guard_status=pass"; else echo "guard_status=needs_clean"; echo "-- misplaced --"; cat "$tmp_misplaced"; fi
     rm -f "$tmp_misplaced" "$tmp_download" "$tmp_conflicts"
 }
@@ -647,7 +647,7 @@ sortify_contract_smoke() {
     normalize_config
     fail=0
     echo "== Sortify Dispatch Contract Smoke =="
-    echo "sortify_version=4.6.5-sort-mode-control"
+    echo "sortify_version=4.7.1-webui-cleanup-hotfix"
     echo "policy_expected=$PIDD_SORTIFY_REQUIRED_POLICY"
     [ "$PIDD_SORTIFY_REQUIRED_POLICY" = "v4115" ] && echo "policy_expected_v4115=PASS" || { echo "policy_expected_v4115=FAIL"; fail=$((fail + 1)); }
     [ -d "$PIDD_RUNTIME_DIR" ] && echo "dispatcher_runtime_present=yes" || echo "dispatcher_runtime_present=no"
@@ -655,7 +655,7 @@ sortify_contract_smoke() {
     echo "dispatcher_integration_state=$(dispatcher_integration_state)"
     echo "dispatcher_link_readonly=PASS"
     contract_smoke_check_contains "custom_prefix_heimnetz" "reason=custom_prefix:heimnetz__" test_filename_status "heimnetz__handover.md" || fail=$((fail + 1))
-    contract_smoke_check_contains "markdown_handover_hold" "reason=markdown_handover_hold" test_filename_status "RELEASE_NOTES_4.6.5-sort-mode-control.md" || fail=$((fail + 1))
+    contract_smoke_check_contains "markdown_handover_hold" "reason=markdown_handover_hold" test_filename_status "RELEASE_NOTES_4.7.1-webui-cleanup-hotfix.md" || fail=$((fail + 1))
     contract_smoke_check_contains "pixel_local_hold_local_hold" "local_hold=yes" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
     contract_smoke_check_contains "pixel_local_hold_no_marker" "dispatcher_marker_required=no" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
     contract_smoke_check_contains "pixel_local_hold_no_sort" "would_sort=no" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
@@ -693,7 +693,7 @@ zip_export_dir() {
 sortify_config_export() {
     normalize_config; ensure_dirs; stamp="$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)"; work="$DEST_BASE/.sortify_config_export_$stamp"; out="$DOWNLOADS/Sortify-Dispatch-config-$stamp.zip"
     rm -rf "$work"; mkdir -p "$work"
-    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.6.5-sort-mode-control"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
+    { echo "backup_format=sortify-dispatch-config-v2"; echo "created_at=$stamp"; echo "version=4.7.1-webui-cleanup-hotfix"; echo "includes_sdd_targets=no"; echo "includes_ssh_keys=no"; echo "includes_dispatcher_config=no"; echo "scope=sortify_only"; echo "includes_custom_park_prefixes=yes"; echo "includes_guard_bounds=yes"; echo "includes_duplicate_mode=yes"; echo "includes_smart_categories=yes"; } > "$work/manifest.env"
     [ -f "$CONF_PATH" ] && cp -f "$CONF_PATH" "$work/sortify.conf" 2>/dev/null || true
     sortify_config_status > "$work/config-status.txt" 2>&1 || true; duplicate_status > "$work/duplicate-status.txt" 2>&1 || true; guard_status > "$work/guard-status.txt" 2>&1 || true; dispatcher_status > "$work/dispatcher-link-status.txt" 2>&1 || true
     [ -f "$MODULE_DIR/module.prop" ] && grep -E '^(id=|name=|version=|versionCode=|author=|description=|updateJson=)' "$MODULE_DIR/module.prop" > "$work/module.prop.snapshot" 2>/dev/null || true
@@ -703,6 +703,87 @@ sortify_config_export() {
 }
 
 
+
+cleanup_tool_bash() {
+    if command -v bash >/dev/null 2>&1; then command -v bash; return 0; fi
+    if [ -x /data/data/com.termux/files/usr/bin/bash ]; then echo /data/data/com.termux/files/usr/bin/bash; return 0; fi
+    echo "cleanup_bash_missing=FAIL"
+    return 70
+}
+
+cleanup_tool_path() {
+    tool="$MODULE_DIR/tools/sortify-download-cleanup.sh"
+    if [ -s "$tool" ]; then echo "$tool"; return 0; fi
+    echo "cleanup_tool_missing=$tool"
+    return 71
+}
+
+cleanup_status() {
+    tool="$(cleanup_tool_path)" || return $?
+    bash_bin="$(cleanup_tool_bash)" || return $?
+    echo "== Sortify Download Cleanup Status =="
+    echo "cleanup_tool_present=yes"
+    echo "cleanup_tool=$tool"
+    echo "cleanup_bash=$bash_bin"
+    echo "cleanup_source=/storage/emulated/0/Download"
+    echo "webui_cleanup_controls=yes"
+    echo "archive_apply_requires=SORTIFY_WEBUI_APPLY_REVIEW_ARCHIVE=yes"
+    echo "archive_safe_requires=SORTIFY_WEBUI_ARCHIVE_SAFE=yes"
+    echo "review_dry_run_requires=SORTIFY_WEBUI_APPROVE_REVIEW_DRY_RUN=yes"
+    echo "host_run=no"
+    echo "sdd_marker_write=no"
+    echo "dns_ha_vip_route_change=no"
+    echo "sha_sidecar=no"
+}
+
+cleanup_tool_run() {
+    cleanup_cmd="$1"
+    cleanup_run_id="${2:-}"
+    tool="$(cleanup_tool_path)" || return $?
+    bash_bin="$(cleanup_tool_bash)" || return $?
+    if [ -n "$cleanup_run_id" ]; then
+        SORTIFY_CLEANUP_SOURCE="/storage/emulated/0/Download" SORTIFY_CLEANUP_RUN_ID="$cleanup_run_id" "$bash_bin" "$tool" "$cleanup_cmd"
+    else
+        SORTIFY_CLEANUP_SOURCE="/storage/emulated/0/Download" "$bash_bin" "$tool" "$cleanup_cmd"
+    fi
+}
+
+cleanup_tool_review() {
+    cleanup_review_subcmd="$1"
+    cleanup_run_id="${2:-}"
+    tool="$(cleanup_tool_path)" || return $?
+    bash_bin="$(cleanup_tool_bash)" || return $?
+    if [ -z "$cleanup_run_id" ]; then echo "cleanup_run_id_required=FAIL"; return 72; fi
+    SORTIFY_CLEANUP_SOURCE="/storage/emulated/0/Download" SORTIFY_CLEANUP_RUN_ID="$cleanup_run_id" "$bash_bin" "$tool" archive-review-approved "$cleanup_review_subcmd"
+}
+
+cleanup_archive_safe_webui() {
+    if [ "${SORTIFY_WEBUI_ARCHIVE_SAFE:-no}" != "yes" ]; then
+        echo "archive_safe_webui_required=ARCHIVE_SAFE"
+        echo "RESULT: SORTIFY_WEBUI_CLEANUP_ARCHIVE_SAFE_REQUIRED rc=42"
+        return 42
+    fi
+    cleanup_tool_run archive-safe "${1:-}"
+}
+
+cleanup_review_dry_run_webui() {
+    if [ "${SORTIFY_WEBUI_APPROVE_REVIEW_DRY_RUN:-no}" != "yes" ]; then
+        echo "review_dry_run_webui_required=APPROVE"
+        echo "RESULT: SORTIFY_WEBUI_REVIEW_DRY_RUN_REQUIRED rc=42"
+        return 42
+    fi
+    SORTIFY_CLEANUP_APPROVED_FOR_ARCHIVE=yes cleanup_tool_review dry-run "${1:-}"
+}
+
+cleanup_review_apply_webui() {
+    if [ "${SORTIFY_WEBUI_APPLY_REVIEW_ARCHIVE:-no}" != "yes" ]; then
+        echo "review_apply_webui_required=APPLY"
+        echo "RESULT: SORTIFY_WEBUI_REVIEW_APPLY_REQUIRED rc=42"
+        return 42
+    fi
+    SORTIFY_CLEANUP_APPLY_REVIEW_ARCHIVE=yes cleanup_tool_review apply "${1:-}"
+}
+
 current_boot_id() {
     if [ -r /proc/sys/kernel/random/boot_id ]; then cat /proc/sys/kernel/random/boot_id 2>/dev/null | sed -n '1p'; return 0; fi
     awk '{print int($1)}' /proc/uptime 2>/dev/null || date '+%s' 2>/dev/null || echo unknown
@@ -711,7 +792,7 @@ current_boot_id() {
 sortify_mode_status() {
     normalize_config
     echo "== Sortify Dispatch Mode Status =="
-    echo "version=4.6.5-sort-mode-control"
+    echo "version=4.7.1-webui-cleanup-hotfix"
     echo "sortify_sort_mode=$SORTIFY_SORT_MODE"
     echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"
     echo "manual_sort_now=available"
@@ -765,7 +846,7 @@ sortify_preview_sort() {
     [ "$max" -lt 1 ] 2>/dev/null && max=1
     [ "$max" -gt 200 ] 2>/dev/null && max=200
     echo "== Sortify Dispatch Preview Sort =="
-    echo "version=4.6.5-sort-mode-control"
+    echo "version=4.7.1-webui-cleanup-hotfix"
     echo "download=$DOWNLOADS"
     echo "dest_base=$DEST_BASE"
     echo "preview_max_files=$max"
@@ -818,6 +899,15 @@ sort_now() {
 case "${1:-sort}" in
     --guard-status|--guard-verify|guard-status|guard-verify) guard_status ;;
     --guard-status-raw|guard-status-raw) guard_status_raw ;;
+    --cleanup-status|cleanup-status) cleanup_status ;;
+    --cleanup-scan|cleanup-scan) cleanup_tool_run scan "${2:-}" ;;
+    --cleanup-guard|cleanup-guard) cleanup_tool_run guard "${2:-}" ;;
+    --cleanup-archive-safe|cleanup-archive-safe) cleanup_archive_safe_webui "${2:-}" ;;
+    --cleanup-verify|cleanup-verify) cleanup_tool_run verify "${2:-}" ;;
+    --cleanup-rollback-info|cleanup-rollback-info) cleanup_tool_run rollback-info "${2:-}" ;;
+    --cleanup-review-dry-run|cleanup-review-dry-run) cleanup_review_dry_run_webui "${2:-}" ;;
+    --cleanup-review-apply|cleanup-review-apply) cleanup_review_apply_webui "${2:-}" ;;
+    --cleanup-review-verify|cleanup-review-verify) cleanup_tool_run verify-review-archive "${2:-}" ;;
     --guard-clean|guard-clean) guard_clean ;;
     --guard-temp-clean|guard-temp-clean) cleanup_guard_temp ;;
     --log-rotate|log-rotate) rotate_logs; echo "log_rotate=done" ;;
@@ -834,5 +924,5 @@ case "${1:-sort}" in
     --test-filename|test-filename) test_filename_status "${2:-}" ;;
     --config-export|config-export) sortify_config_export ;;
     --sort|sort|"") sort_now ;;
-    *) echo "Usage: action.sh [--sort|--mode-status|--preview-sort|--service-cycle|--guard-status|--guard-status-raw|--guard-clean|--guard-temp-clean|--log-rotate|--dispatcher-status|--explain-route NAME|--marker-status NAME|--contract-smoke|--config-status|--duplicate-status|--custom-prefixes-status|--test-filename NAME|--config-export]"; exit 2 ;;
+    *) echo "Usage: action.sh [--sort|--mode-status|--preview-sort|--service-cycle|--guard-status|--guard-status-raw|--guard-clean|--guard-temp-clean|--log-rotate|--dispatcher-status|--explain-route NAME|--marker-status NAME|--contract-smoke|--config-status|--duplicate-status|--custom-prefixes-status|--test-filename NAME|--config-export|--cleanup-status|--cleanup-scan [RUN_ID]|--cleanup-guard RUN_ID|--cleanup-archive-safe RUN_ID|--cleanup-verify RUN_ID|--cleanup-rollback-info [RUN_ID]|--cleanup-review-dry-run RUN_ID|--cleanup-review-apply RUN_ID|--cleanup-review-verify RUN_ID]"; exit 2 ;;
 esac

@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_DOC_START -->
+## WebUI integration: v4.7.1-webui-cleanup-hotfix
+
+The Download Cleanup maintenance flow is now exposed in WebUI as explicit/manual controls. This includes status, scan, guard, archive-safe, verify, rollback-info, review dry-run, review apply and verify-review-archive.
+
+Dangerous actions remain gated: review dry-run requires `APPROVE`, archive-safe requires `ARCHIVE_SAFE`, and review apply requires `APPLY`. No cleanup automation was added to service, boot, watcher, watchdog or queue paths.
+
+Boundary markers: `runtime_install=no`, `new_real_file_move=no`, `host_run=no`, `sdd_marker_write=no`, `dns_ha_vip_route_change=no`, `sha_sidecar=no`.
+<!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_DOC_END -->
+
 <!-- SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_DOC_START -->
 ## Release integration: v4.7.0-download-cleanup-integration
 

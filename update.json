@@ -1,6 +1,6 @@
 {
-  "version": "4.7.0-download-cleanup-integration",
-  "versionCode": 24,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.7.0-download-cleanup-integration/Sortify-Dispatch-v4.7.0-download-cleanup-integration.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.7.0-download-cleanup-integration.md"
+  "version": "4.7.1-webui-cleanup-hotfix",
+  "versionCode": 25,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.7.1-webui-cleanup-hotfix/Sortify-Dispatch-v4.7.1-webui-cleanup-hotfix.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.7.1-webui-cleanup-hotfix.md"
 }

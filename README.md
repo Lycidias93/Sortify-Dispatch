@@ -1,3 +1,15 @@
+<!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_START -->
+## Sortify Dispatch v4.7.1-webui-cleanup-hotfix
+
+Release: `4.7.1-webui-cleanup-hotfix` / `versionCode=25`.
+
+This hotfix fixes stale action/status version output after v4.7.0 and exposes Download Cleanup maintenance in WebUI with explicit operator gates.
+
+WebUI coverage: cleanup status, scan, guard, archive-safe, verify, rollback-info, archive-review-approved dry-run, archive-review-approved apply and verify-review-archive.
+
+Safety: `APPROVE`, `ARCHIVE_SAFE` and `APPLY` typed confirmations are required for planning or movement actions; `runtime_install=no`, `new_real_file_move=no`, `host_run=no`, `sdd_marker_write=no`, `dns_ha_vip_route_change=no`, `sha_sidecar=no` for this release step.
+<!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_END -->
+
 <!-- SORTIFY_DISPATCH_V470_DOWNLOAD_CLEANUP_INTEGRATION_START -->
 ## Sortify Dispatch v4.7.0-download-cleanup-integration
 
