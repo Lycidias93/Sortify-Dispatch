@@ -116,31 +116,93 @@ def release_body_items(body):
     return items
 
 
-def important_prerelease_items(items, limit=2):
-    """Pick only end-user relevant prerelease changes/features/fixes."""
+def compact_prerelease_line(line):
+    line = clean_line(str(line))
+    line = re.sub(r"\s*[:：]\s*$", "", line).strip()
+    line = re.sub(r"\s+", " ", line).strip()
+    return line[:180]
+
+
+def prerelease_candidate_items(body, limit=8):
+    """Return compact end-user candidate lines for prerelease posts."""
+    skip = re.compile(
+        r"(verified|verification|android |pixel 10|mustang|credits?|harish|codecity|joshua|sha256|"
+        r"artifact|download|install command|tombstone|tensorconservative|research-only|blocked:|"
+        r"commit|cherry-pick|mockup|audit|docs?|read-only helper|pass\.?$|^no |^final verified|"
+        r"contributors?|github release|http|```|</?details|</?summary)",
+        re.I,
+    )
+    heading = re.compile(r"^(highlights?|what changed|changes?|changelog|summary|verified|credits?|artifact unchanged)\s*:?$", re.I)
     positive = re.compile(
         r"(add|adds|added|enable|enables|enabled|support|supports|supported|fix|fixes|fixed|"
         r"improve|improves|improved|preserve|preserves|preserved|keep|keeps|kept|restore|restores|"
         r"restored|prevent|prevents|prevented|fallback|use-last|saved settings|setting|settings|"
-        r"outdoor|profile|zram|thermal|battery|boot|runtime)", re.I)
-    noise = re.compile(
-        r"(verified|verification|android |pixel 10|mustang|credits?|harish|codecity|joshua|sha256|"
-        r"artifact|download|install command|tombstone|tensorconservative|research-only|blocked:|"
-        r"commit|cherry-pick|mockup|audit|docs?|read-only helper|active\.?$|pass\.?$|^no |^final verified)", re.I)
-    shouting = re.compile(r"^[A-Z0-9_ ./-]{18,}$")
-    out=[]; seen=set()
-    for raw in items or []:
-        item=clean_line(str(raw))[:180]
-        if not item or len(item)<8 or noise.search(item):
+        r"outdoor|profile|zram|thermal|battery|boot|runtime|module manager|description|layout|"
+        r"overlay|polling|throttle|memory|control)",
+        re.I,
+    )
+    out = []
+    seen = set()
+    in_code = False
+    for raw in (body or "").splitlines():
+        raw_s = raw.strip()
+        if raw_s.startswith("```"):
+            in_code = not in_code
             continue
-        if shouting.match(item) and item.upper()==item:
+        if in_code or not raw_s:
+            continue
+        item = compact_prerelease_line(raw_s)
+        if not item or len(item) < 8:
+            continue
+        if heading.match(item):
+            continue
+        if skip.search(item):
             continue
         if not positive.search(item):
             continue
-        key=item.lower()
+        key = item.lower()
         if key not in seen:
-            seen.add(key); out.append(item)
-        if len(out)>=limit: return out
+            seen.add(key)
+            out.append(item)
+        if len(out) >= limit:
+            return out
+    return out
+
+
+def important_prerelease_items(items, limit=2):
+    """Pick only important end-user prerelease features/fixes."""
+    positive = re.compile(
+        r"(add|adds|added|enable|enables|enabled|support|supports|supported|fix|fixes|fixed|"
+        r"improve|improves|improved|preserve|preserves|preserved|keep|keeps|kept|restore|restores|"
+        r"restored|prevent|prevents|prevented|fallback|use-last|saved settings|setting|settings|"
+        r"outdoor|profile|zram|thermal|battery|boot|runtime|module manager|description|layout|"
+        r"overlay|polling|throttle|memory|control)",
+        re.I,
+    )
+    noise = re.compile(
+        r"(verified|verification|android |pixel 10|mustang|credits?|harish|codecity|joshua|sha256|"
+        r"artifact|download|install command|tombstone|tensorconservative|research-only|blocked:|"
+        r"commit|cherry-pick|mockup|audit|docs?|read-only helper|pass\.?$|^no |^final verified|"
+        r"contributors?|github release|http)",
+        re.I,
+    )
+    shouting = re.compile(r"^[A-Z0-9_ ./-]{18,}$")
+    out = []
+    seen = set()
+    for raw in items or []:
+        item = compact_prerelease_line(raw)
+        if not item or len(item) < 8 or noise.search(item):
+            continue
+        if shouting.match(item) and item.upper() == item:
+            continue
+        if not positive.search(item):
+            continue
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+        if len(out) >= limit:
+            return out
     return out
 
 def previous_public_release(release):
@@ -241,12 +303,14 @@ def build_messages(release):
     if prerelease:
         pre_items = important_prerelease_items(bullets, limit=2)
         if not pre_items:
+            pre_items = important_prerelease_items(prerelease_candidate_items(release.get("body") or ""), limit=2)
+        if not pre_items:
             pre_items = important_prerelease_items(compare_commit_bullets(prev_tag, tag), limit=2)
         link = f'<a href="{html.escape(url)}">Open GitHub Pre-release</a>'
         if pre_items:
-            lines = [f"• {html.escape(item)}" for item in pre_items]
+            lines = [f"• {html.escape(item)}" for item in pre_items[:2]]
             return ["\n\n".join(header + ["<b>Important changes</b>"] + lines + [link])]
-        return ["\n\n".join(header + [link])]
+        return ["\n\n".join(header + ["<b>Important changes</b>", "• See GitHub Pre-release for details.", link])]
     since = f"since {prev_tag}" if prev_tag else "since the previous public release"
     if not bullets:
         bullets = compare_commit_bullets(prev_tag, tag)
@@ -254,7 +318,7 @@ def build_messages(release):
         bullets = ["See GitHub Release for details."]
     return split_messages(header, f"<b>Changelog {html.escape(since)}</b>", bullets, url)
 
-def send_telegram(text):
+def send_telegram(text, disable_web_page_preview=False):
     if DRY_RUN:
         log("DRY_RUN telegram_send=skip")
         log(text)
@@ -262,7 +326,10 @@ def send_telegram(text):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         raise SystemExit("FAIL: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing")
     endpoint = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = urllib.parse.urlencode({"chat_id": TELEGRAM_CHAT_ID, "parse_mode": "HTML", "text": text}).encode("utf-8")
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "parse_mode": "HTML", "text": text}
+    if disable_web_page_preview:
+        payload["disable_web_page_preview"] = "true"
+    data = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(endpoint, data=data, method="POST")
     with urllib.request.urlopen(req, timeout=30) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
@@ -273,11 +340,11 @@ def selftest():
     global REPO
     REPO = "Lycidias93/example"
     pre = {
-        "tag_name": "v9.9.9-test.1",
-        "name": "New Release v9.9.9-test.1",
-        "html_url": "https://github.com/Lycidias93/example/releases/tag/v9.9.9-test.1",
+        "tag_name": "v1.5.1-universal-test.2",
+        "name": "Pre-release v1.5.1-universal-test.2",
+        "html_url": "https://github.com/Lycidias93/example/releases/tag/v1.5.1-universal-test.2",
         "prerelease": True,
-        "body": "Verified:\n• Pixel 10 Pro XL / mustang\nHighlights:\n• Preserves Use-last settings fallback.\n• Adds Outdoor profile support.\n• Credits Somebody",
+        "body": "Prerelease test for Pixel 10 Thermal & Memory Control.\nWhat changed\nAdds dynamic module manager description:\nVerified:\nPixel 10 Pro XL / mustang\nCredits Somebody",
     }
     stable = {
         "tag_name": "v9.9.9",
@@ -288,18 +355,16 @@ def selftest():
     }
     pre_msg = build_messages(pre)[0]
     stable_msg = "\n---\n".join(build_messages(stable))
+    assert "<b>Important changes</b>" in pre_msg
+    assert "Adds dynamic module manager description" in pre_msg
+    assert "Pixel 10" not in pre_msg
+    assert "Credits" not in pre_msg
     assert "Open GitHub Pre-release" in pre_msg
-    assert "Important changes" in pre_msg
-    assert "Preserves Use-last settings fallback" in pre_msg
-    assert "Adds Outdoor profile support" in pre_msg
-    assert "Pixel 10 Pro XL" not in pre_msg
-    assert "Credits Somebody" not in pre_msg
-    assert "Changelog" not in pre_msg
     assert "stable changelog line must be posted" in stable_msg
     assert "verified detail must be posted" in stable_msg
     assert "225013f7" not in stable_msg
     assert "file.zip" not in stable_msg
-    log("PASS: pre_minimal_important_changelog")
+    log("PASS: pre_compact_visual_important_changelog")
     log("PASS: pre_noise_filtered")
     log("PASS: stable_full_changelog")
     log("PASS: artifact_noise_filtered")
@@ -325,7 +390,7 @@ def main_announcement():
     log(f"messages={len(messages)}")
     for idx, message in enumerate(messages, 1):
         log(f"telegram_message={idx}/{len(messages)} chars={len(message)}")
-        send_telegram(message)
+        send_telegram(message, disable_web_page_preview=bool(release.get("prerelease")))
         time.sleep(0.5)
     log("RESULT: TELEGRAM_RELEASE_ANNOUNCEMENT_DONE rc=0")
 
