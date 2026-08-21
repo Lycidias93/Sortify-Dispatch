@@ -7,7 +7,7 @@ MODDIR=${MODULE_DIR:-${BINDIR%/bin}}
 BASE="$BINDIR/module-control-base"
 STATE_DIR=${MODULE_STATE_DIR:-/data/adb/sortify}
 CONFIG_FILE=${SORTIFY_CONFIG_FILE:-$STATE_DIR/sortify.conf}
-LEGACY_MIRROR="$MODDIR/sortify.conf"
+LEGACY_MIRROR=${SORTIFY_LEGACY_MIRROR:-$MODDIR/sortify.conf}
 
 [ -x "$BASE" ] || { echo '{"ok":false,"error":"Sortify module-control base unavailable"}' >&2; exit 69; }
 
