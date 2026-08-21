@@ -1,38 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="4.1-guard-tools"
-TAG="v4.1-guard-tools"
-ZIP_NAME="Sortify-Dispatch-v4.1-guard-tools.zip"
-RELEASE_DIR="releases/$TAG"
-mkdir -p "$RELEASE_DIR"
-rm -f "$RELEASE_DIR/$ZIP_NAME" "$RELEASE_DIR/$ZIP_NAME.sha256"
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+CORE="$ROOT/.webui-core"
+CORE_COMMIT=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb
+CORE_VERSION=0.6.1
+MODULE_SRC="$ROOT/module"
+DIST="$ROOT/dist"
 
-required=(module.prop action.sh service.sh customize.sh uninstall.sh sortify.conf webroot/index.html ARTIFACT_GUARD.md README.md CHANGELOG.md update.json)
-for f in "${required[@]}"; do
-  test -s "$f" || { echo "missing=$f"; exit 1; }
-done
+if [[ ! -f "$CORE/CORE_VERSION" ]]; then
+  git -C "$ROOT" submodule update --init --checkout .webui-core
+fi
+[[ "$(git -C "$CORE" rev-parse HEAD)" == "$CORE_COMMIT" ]] || { echo "webui_core_commit_mismatch"; exit 1; }
+[[ "$(tr -d '\r\n' < "$CORE/CORE_VERSION")" == "$CORE_VERSION" ]] || { echo "webui_core_version_mismatch"; exit 1; }
 
-sh -n action.sh
-sh -n service.sh
-sh -n customize.sh
-sh -n uninstall.sh
-bash tools/smoke-artifact-guard.sh >/dev/null
+"$ROOT/tools/test-vnext.sh" --source-only
 
-zip -qr "$RELEASE_DIR/$ZIP_NAME" \
-  module.prop \
-  action.sh \
-  service.sh \
-  customize.sh \
-  uninstall.sh \
-  sortify.conf \
-  webroot \
-  banner.png \
-  ARTIFACT_GUARD.md \
-  README.md \
-  CHANGELOG.md \
-  update.json
+VERSION=$(sed -n 's/^version=//p' "$MODULE_SRC/module.prop" | head -n1)
+[[ -n "$VERSION" ]] || { echo "module_version_missing"; exit 1; }
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+STAGE="$WORK/module"
+mkdir -p "$STAGE"
+cp -a "$MODULE_SRC/." "$STAGE/"
+cp -a "$CORE/module/META-INF" "$STAGE/"
+cp -f "$CORE/module/action.sh" "$STAGE/action.sh"
+rm -rf "$STAGE/webroot"
+cp -a "$CORE/module/webroot" "$STAGE/webroot"
+mkdir -p "$STAGE/bin" "$STAGE/tools"
+cp -f "$ROOT/tools/sortify-download-cleanup.sh" "$STAGE/tools/sortify-download-cleanup.sh"
 
-( cd "$RELEASE_DIR" && sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256" )
-printf 'release_zip=%s\n' "$PWD/$RELEASE_DIR/$ZIP_NAME"
-printf 'release_sha=%s\n' "$(awk '{print $1}' "$RELEASE_DIR/$ZIP_NAME.sha256")"
+(
+  cd "$CORE"
+  CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -buildvcs=false -trimpath \
+    -ldflags "-s -w -X main.version=$CORE_VERSION" \
+    -o "$STAGE/bin/webui-server-arm64" ./server/cmd/webui-server
+)
+
+chmod 0755 "$STAGE/action.sh" "$STAGE/service.sh" "$STAGE/customize.sh" "$STAGE/uninstall.sh" \
+  "$STAGE/bin/module-control" "$STAGE/bin/sortify-domain" "$STAGE/bin/webui-server-arm64" \
+  "$STAGE/tools/sortify-download-cleanup.sh"
+chmod 0644 "$STAGE/module.prop" "$STAGE/config/sortify.conf.default" "$STAGE"/webroot/*
+
+cmp "$STAGE/action.sh" "$CORE/module/action.sh"
+diff -qr "$STAGE/webroot" "$CORE/module/webroot" >/dev/null
+
+mkdir -p "$DIST"
+rm -f "$DIST/Sortify-Dispatch-$VERSION.zip" "$DIST/build-manifest.json"
+python3 "$ROOT/tools/package-vnext.py" \
+  --stage "$STAGE" \
+  --output "$DIST/Sortify-Dispatch-$VERSION.zip" \
+  --manifest "$DIST/build-manifest.json" \
+  --core-version "$CORE_VERSION" \
+  --core-commit "$CORE_COMMIT"
+
+echo "RESULT: SORTIFY_VNEXT_BUILD_DONE outcome=success workflow_exit_code=0"
