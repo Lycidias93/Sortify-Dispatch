@@ -33,11 +33,11 @@ jobs:
 
       - name: Verify source contracts
         shell: bash
-        run: ./tools/test-vnext.sh --source-only
+        run: bash ./tools/test-vnext.sh --source-only
 
       - name: Build deterministic candidate
         shell: bash
-        run: ./tools/build-release.sh
+        run: bash ./tools/build-release.sh
 
       - name: Verify repository remains clean
         shell: bash
