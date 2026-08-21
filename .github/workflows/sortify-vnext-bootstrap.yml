@@ -35,14 +35,23 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p module/bin module/config
-          mv action.sh module/bin/sortify-domain
-          mv service.sh module/service.sh
-          mv customize.sh module/customize.sh
-          mv uninstall.sh module/uninstall.sh
-          mv sortify.conf module/config/sortify.conf.default
-          mv module.prop module/module.prop
+          if [ -f sortify-domain.sh ]; then
+            cp -f sortify-domain.sh module/bin/sortify-domain
+          else
+            cp -f action.sh module/bin/sortify-domain
+          fi
+          cp -f service.sh module/service.sh
+          cp -f customize.sh module/customize.sh
+          cp -f uninstall.sh module/uninstall.sh
+          if [ -f config/sortify.conf.default ]; then
+            cp -f config/sortify.conf.default module/config/sortify.conf.default
+          else
+            cp -f sortify.conf module/config/sortify.conf.default
+          fi
+          cp -f module.prop module/module.prop
           cp -f banner.png module/banner.png
-          rm -rf webroot
+          rm -f action.sh service.sh customize.sh uninstall.sh sortify.conf module.prop sortify-domain.sh
+          rm -rf webroot config
           chmod 0755 module/bin/sortify-domain module/action.sh module/service.sh module/customize.sh module/uninstall.sh
           git status --short
 
