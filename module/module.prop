@@ -1,0 +1,8 @@
+id=sortify
+name=Sortify Dispatch
+version=4.8.0-vnext-core061
+versionCode=26
+author=xCaptaiN09 + Lycidias93
+description=Sortify Dispatch vNext with shared WebUI Core 0.6.1, typed settings/actions and persistent config; SDD policy v4115 remains unchanged.
+updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
+banner=banner.png

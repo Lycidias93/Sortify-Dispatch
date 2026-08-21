@@ -1,0 +1,4 @@
+[submodule ".webui-core"]
+	path = .webui-core
+	url = https://github.com/Lycidias93/android-root-module-webui-template.git
+	branch = main

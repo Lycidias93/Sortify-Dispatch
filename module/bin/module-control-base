@@ -1,0 +1,353 @@
+#!/system/bin/sh
+set -u
+umask 077
+
+BINDIR=${0%/*}
+MODDIR=${MODULE_DIR:-${BINDIR%/bin}}
+PROP="$MODDIR/module.prop"
+MODULE_ID=sortify
+MODULE_NAME=$(sed -n 's/^name=//p' "$PROP" 2>/dev/null | head -n 1)
+MODULE_VERSION=$(sed -n 's/^version=//p' "$PROP" 2>/dev/null | head -n 1)
+STATE_DIR=${MODULE_STATE_DIR:-/data/adb/sortify}
+RUNTIME_DIR=${WEBUI_RUNTIME_DIR:-/data/local/tmp/sortify-webui}
+CONFIG_FILE=${SORTIFY_CONFIG_FILE:-$STATE_DIR/sortify.conf}
+DEFAULT_CONFIG="$MODDIR/config/sortify.conf.default"
+LEGACY_CONFIG=/data/adb/modules/sortify/sortify.conf
+DOMAIN="$BINDIR/sortify-domain"
+LOCK_DIR="$RUNTIME_DIR/config.lock"
+DEST_BASE=${DEST_BASE:-/sdcard/Sortify}
+
+mkdir -p "$STATE_DIR" "$RUNTIME_DIR" "$STATE_DIR/backups" 2>/dev/null || true
+chmod 0700 "$STATE_DIR" "$RUNTIME_DIR" "$STATE_DIR/backups" 2>/dev/null || true
+
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g'
+}
+json_string() { printf '"%s"' "$(json_escape "$1")"; }
+
+cfg_raw() {
+  key=$1
+  file=${2:-$CONFIG_FILE}
+  sed -n "s/^${key}=//p" "$file" 2>/dev/null | tail -n 1
+}
+
+bool_value() {
+  key=$1; fallback=$2; value=$(cfg_raw "$key")
+  case "$value" in 0|1) printf '%s' "$value" ;; *) printf '%s' "$fallback" ;; esac
+}
+
+uint_value() {
+  key=$1; fallback=$2; min=$3; max=$4; value=$(cfg_raw "$key")
+  case "$value" in ""|*[!0-9]*) value=$fallback ;; esac
+  [ "$value" -ge "$min" ] 2>/dev/null || value=$fallback
+  [ "$value" -le "$max" ] 2>/dev/null || value=$max
+  printf '%s' "$value"
+}
+
+enum_value() {
+  key=$1; fallback=$2; allowed=$3; value=$(cfg_raw "$key")
+  for item in $allowed; do [ "$value" = "$item" ] && { printf '%s' "$value"; return; }; done
+  printf '%s' "$fallback"
+}
+
+prefixes_valid() {
+  value=$1
+  [ "${#value}" -le 4096 ] || return 1
+  [ -z "$value" ] && return 0
+  old_ifs=$IFS; IFS=,
+  for raw in $value; do
+    item=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    case "$item" in ""|target-*|targets-*|*[!a-z0-9_.-]*) IFS=$old_ifs; return 1 ;; esac
+    [ "${#item}" -ge 3 ] && [ "${#item}" -le 64 ] || { IFS=$old_ifs; return 1; }
+  done
+  IFS=$old_ifs
+  return 0
+}
+
+prefixes_value() {
+  value=$(cfg_raw SORTIFY_CUSTOM_PARK_PREFIXES)
+  prefixes_valid "$value" && printf '%s' "$value" || printf ''
+}
+
+write_complete_config_from() {
+  source=$1; out=$2
+  source_value() { sed -n "s/^$1=//p" "$source" 2>/dev/null | tail -n 1; }
+  pick() { value=$(source_value "$1"); [ -n "$value" ] && printf '%s' "$value" || printf '%s' "$2"; }
+  {
+    printf 'INTERVAL=%s\n' "$(pick INTERVAL 300)"
+    printf 'GUARD_LOG=%s\n' "$(pick GUARD_LOG 1)"
+    printf 'SORTIFY_NORMAL_SORT=%s\n' "$(pick SORTIFY_NORMAL_SORT 1)"
+    printf 'SORTIFY_SORT_MODE=%s\n' "$(pick SORTIFY_SORT_MODE interval)"
+    printf 'SORTIFY_HOLD_PROTECTED=%s\n' "$(pick SORTIFY_HOLD_PROTECTED 1)"
+    printf 'SORTIFY_DISPATCHER_INTEGRATION=%s\n' "$(pick SORTIFY_DISPATCHER_INTEGRATION auto)"
+    printf 'SORTIFY_CUSTOM_PARK_PREFIXES=%s\n' "$(source_value SORTIFY_CUSTOM_PARK_PREFIXES)"
+    printf 'SORTIFY_GUARD_MAX_FILES=%s\n' "$(pick SORTIFY_GUARD_MAX_FILES 300)"
+    printf 'SORTIFY_GUARD_STATUS_TIMEOUT=%s\n' "$(pick SORTIFY_GUARD_STATUS_TIMEOUT 8)"
+    printf 'SORTIFY_DUPLICATE_MODE=%s\n' "$(pick SORTIFY_DUPLICATE_MODE filename)"
+    printf 'SORTIFY_LOG_MAX_KB=%s\n' "$(pick SORTIFY_LOG_MAX_KB 1024)"
+    printf 'SORTIFY_GUARD_TEMP_CLEAN_ON_SORT=%s\n' "$(pick SORTIFY_GUARD_TEMP_CLEAN_ON_SORT 1)"
+    printf 'SORTIFY_PREVIEW_MAX_FILES=%s\n' "$(pick SORTIFY_PREVIEW_MAX_FILES 50)"
+    printf 'SORTIFY_DISPATCHER_RUNTIME_DIR=/data/adb/ssh-drop-dispatcher\n'
+    printf 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115\n'
+    printf 'SORTIFY_DISPATCHER_RELEASE_DIR=/data/adb/ssh-drop-dispatcher/integration/sortify-release\n'
+  } > "$out"
+}
+
+initialize_config() {
+  tmp="$CONFIG_FILE.tmp.$$"
+  if [ -f "$CONFIG_FILE" ]; then
+    write_complete_config_from "$CONFIG_FILE" "$tmp" || return 1
+    if cmp -s "$CONFIG_FILE" "$tmp" 2>/dev/null; then
+      rm -f "$tmp"
+      chmod 0600 "$CONFIG_FILE" 2>/dev/null || true
+      return 0
+    fi
+    stamp=$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)
+    cp -f "$CONFIG_FILE" "$STATE_DIR/backups/sortify.conf.pre-normalize.$stamp" 2>/dev/null || true
+    chmod 0600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$CONFIG_FILE"
+    return $?
+  fi
+  source=$DEFAULT_CONFIG
+  [ -f "$LEGACY_CONFIG" ] && source=$LEGACY_CONFIG
+  [ -f "$source" ] || return 1
+  write_complete_config_from "$source" "$tmp" || return 1
+  chmod 0600 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$CONFIG_FILE"
+}
+
+initialize_config || { echo '{"ok":false,"error":"Sortify config initialization failed"}' >&2; exit 1; }
+
+request_file_allowed() {
+  path=$1
+  case "$path" in "$RUNTIME_DIR"/requests/*.json) ;; *) return 1 ;; esac
+  [ -f "$path" ] || return 1
+  [ ! -L "$path" ] || return 1
+  size=$(wc -c < "$path" 2>/dev/null || echo 999999)
+  case "$size" in ""|*[!0-9]*) return 1 ;; esac
+  [ "$size" -ge 1 ] && [ "$size" -le 65536 ]
+}
+
+json_bool() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$2" | head -n 1; }
+json_uint() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$2" | head -n 1; }
+json_text() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\([^"\\]*\)".*/\1/p' "$2" | head -n 1; }
+
+acquire_lock() {
+  attempts=0
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    attempts=$((attempts + 1)); [ "$attempts" -lt 20 ] || return 1; sleep 0.1
+  done
+}
+release_lock() { rmdir "$LOCK_DIR" 2>/dev/null || true; }
+
+run_domain() {
+  [ -x "$DOMAIN" ] || { echo "Sortify domain backend unavailable" >&2; return 69; }
+  MODULE_DIR="$MODDIR" CONF_PATH="$CONFIG_FILE" sh "$DOMAIN" "$@"
+}
+
+config_json() {
+  guard_log=$(bool_value GUARD_LOG 1); normal_sort=$(bool_value SORTIFY_NORMAL_SORT 1); hold=$(bool_value SORTIFY_HOLD_PROTECTED 1); temp_clean=$(bool_value SORTIFY_GUARD_TEMP_CLEAN_ON_SORT 1)
+  [ "$guard_log" = 1 ] && guard_log=true || guard_log=false
+  [ "$normal_sort" = 1 ] && normal_sort=true || normal_sort=false
+  [ "$hold" = 1 ] && hold=true || hold=false
+  [ "$temp_clean" = 1 ] && temp_clean=true || temp_clean=false
+  printf '{"interval":%s,"guard_log":%s,"normal_sort":%s,"sort_mode":' "$(uint_value INTERVAL 300 30 86400)" "$guard_log" "$normal_sort"
+  json_string "$(enum_value SORTIFY_SORT_MODE interval 'interval manual boot_once')"
+  printf ',"hold_protected":%s,"dispatcher_integration":' "$hold"; json_string "$(enum_value SORTIFY_DISPATCHER_INTEGRATION auto 'off auto on')"
+  printf ',"duplicate_mode":'; json_string "$(enum_value SORTIFY_DUPLICATE_MODE filename 'filename checksum_delete_identical')"
+  printf ',"custom_park_prefixes":'; json_string "$(prefixes_value)"
+  printf ',"guard_max_files":%s,"guard_timeout":%s,"log_max_kb":%s,"guard_temp_clean":%s,"preview_max_files":%s}' \
+    "$(uint_value SORTIFY_GUARD_MAX_FILES 300 1 2000)" \
+    "$(uint_value SORTIFY_GUARD_STATUS_TIMEOUT 8 2 60)" \
+    "$(uint_value SORTIFY_LOG_MAX_KB 1024 64 16384)" "$temp_clean" \
+    "$(uint_value SORTIFY_PREVIEW_MAX_FILES 50 1 200)"
+}
+
+print_capabilities() {
+  printf '{"schema":"root-module-webui.capabilities.v1","module":{"id":"sortify","name":'; json_string "${MODULE_NAME:-Sortify Dispatch}"; printf ',"version":'; json_string "${MODULE_VERSION:-unknown}"; printf '},'
+  printf '"features":{"config":true,"logs":true,"actions":true,"jobs":true,"inventory":true},"config_fields":['
+  printf '{"key":"interval","label":"Sort interval","description":"Automatic interval in seconds. Used only in interval mode.","type":"integer","required":true,"min":30,"max":86400},'
+  printf '{"key":"guard_log","label":"Guard logging","description":"Write bounded guard events.","type":"boolean","required":true},'
+  printf '{"key":"normal_sort","label":"Normal sorting","description":"Allow normal Download sorting.","type":"boolean","required":true},'
+  printf '{"key":"sort_mode","label":"Automatic sort mode","description":"Choose interval, manual or once per boot.","type":"enum","required":true,"options":[{"value":"interval","label":"Interval"},{"value":"manual","label":"Manual"},{"value":"boot_once","label":"Once per boot"}]},'
+  printf '{"key":"hold_protected","label":"Hold protected artifacts","description":"Keep operational artifacts in Download until their safety contract allows release.","type":"boolean","required":true},'
+  printf '{"key":"dispatcher_integration","label":"Dispatcher integration","description":"off ignores SDD markers, auto uses a healthy SDD link, on requires it.","type":"enum","required":true,"options":[{"value":"off","label":"Off"},{"value":"auto","label":"Auto"},{"value":"on","label":"Required"}]},'
+  printf '{"key":"duplicate_mode","label":"Duplicate handling","description":"Checksum mode deletes only byte-identical sources after SHA-256 match.","type":"enum","required":true,"options":[{"value":"filename","label":"Filename only"},{"value":"checksum_delete_identical","label":"Checksum identical"}]},'
+  printf '{"key":"custom_park_prefixes","label":"Custom park prefixes","description":"Comma-separated local-hold prefixes. target- and targets- are reserved for SDD.","type":"string","required":false,"max_length":4096,"pattern":"^[A-Za-z0-9_.-]*(,[A-Za-z0-9_.-]+)*$"},'
+  printf '{"key":"guard_max_files","label":"Guard scan limit","description":"Maximum protected files inspected by bounded guard status.","type":"integer","required":true,"min":1,"max":2000},'
+  printf '{"key":"guard_timeout","label":"Guard timeout","description":"Bounded guard status timeout in seconds.","type":"integer","required":true,"min":2,"max":60},'
+  printf '{"key":"log_max_kb","label":"Log rotation size","description":"Rotate Sortify logs above this size in KiB.","type":"integer","required":true,"min":64,"max":16384},'
+  printf '{"key":"guard_temp_clean","label":"Clean stale guard temp files","description":"Remove stale Sortify guard temp files before sorting.","type":"boolean","required":true},'
+  printf '{"key":"preview_max_files","label":"Preview file limit","description":"Maximum files shown by Preview Sort.","type":"integer","required":true,"min":1,"max":200}'
+  printf '],"actions":['
+  printf '{"name":"sort-now","label":"Sort now","description":"Run one normal Sortify pass. Preview uses the existing read-only route logic.","risk":"caution","supports_dry_run":true},'
+  printf '{"name":"guard-status","label":"Guard status","description":"Bounded read-only protected-artifact audit.","risk":"safe"},'
+  printf '{"name":"guard-clean","label":"Restore misplaced protected artifacts","description":"Move misplaced protected artifacts back to Download; collisions go to GuardConflicts.","risk":"caution"},'
+  printf '{"name":"guard-temp-clean","label":"Clean guard temp files","description":"Remove stale Sortify-owned temp files only.","risk":"caution"},'
+  printf '{"name":"dispatcher-status","label":"Dispatcher link status","description":"Read-only SDD integration health and v4115 policy state.","risk":"safe"},'
+  printf '{"name":"contract-smoke","label":"Contract smoke","description":"Run the read-only Sortify/SDD v4115 contract smoke.","risk":"safe"},'
+  printf '{"name":"log-rotate","label":"Rotate logs","description":"Rotate bounded Sortify logs now.","risk":"safe"}'
+  printf '],"jobs":['
+  printf '{"name":"cleanup-scan","label":"Cleanup scan","description":"Read-only Download cleanup candidate scan.","risk":"safe"},'
+  printf '{"name":"config-export","label":"Export Sortify config","description":"Create the existing Sortify-only configuration export in Download.","risk":"caution"}'
+  printf '],"inventories":['
+  printf '{"name":"guard","label":"Guard","description":"Current bounded protected-artifact status."},'
+  printf '{"name":"dispatcher","label":"SDD link","description":"Read-only SDD v4115 integration state."},'
+  printf '{"name":"cleanup","label":"Cleanup","description":"Download cleanup helper availability and safety state."}'
+  printf ']}\n'
+}
+
+print_v04_capabilities() {
+  printf '%s\n' '{"schema":"root-module-webui.extensions.v2","module":{"id":"sortify","name":"Sortify Dispatch"},"features":{"typed_jobs":true,"inventory_operations":false,"references":false},"jobs":[{"name":"test-filename","label":"Test filename","description":"Classify one filename without touching files.","risk":"safe","parameters":[{"key":"filename","label":"Filename","type":"string","required":true,"max_length":255,"pattern":"^[^/\\\\]+$"}]},{"name":"explain-route","label":"Explain route","description":"Explain local hold, SDD routing and Sortify release behavior for one filename.","risk":"safe","parameters":[{"key":"filename","label":"Filename","type":"string","required":true,"max_length":255,"pattern":"^[^/\\\\]+$"}]},{"name":"marker-status","label":"Marker status","description":"Read-only v4115 marker evaluation for one Download filename.","risk":"safe","parameters":[{"key":"filename","label":"Filename","type":"string","required":true,"max_length":255,"pattern":"^[^/\\\\]+$"}]},{"name":"cleanup-guard","label":"Cleanup guard","description":"Validate one exact cleanup run before archive operations.","risk":"safe","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"}]},{"name":"cleanup-verify","label":"Verify cleanup archive","description":"Verify an existing cleanup archive run.","risk":"safe","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"}]},{"name":"cleanup-rollback-info","label":"Rollback info","description":"Show rollback information for an exact cleanup run.","risk":"safe","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"}]},{"name":"cleanup-archive-safe","label":"Archive safe","description":"Archive only candidates already accepted by cleanup guard.","risk":"caution","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"},{"key":"confirmation","label":"Confirmation","description":"Type ARCHIVE_SAFE exactly.","type":"string","required":true,"max_length":12,"pattern":"^ARCHIVE_SAFE$"}]},{"name":"cleanup-review-dry-run","label":"Review archive preview","description":"Preview an approved stale-review archive without moving files.","risk":"safe","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"},{"key":"confirmation","label":"Confirmation","description":"Type APPROVE exactly.","type":"string","required":true,"max_length":7,"pattern":"^APPROVE$"}]},{"name":"cleanup-review-apply","label":"Apply review archive","description":"Apply only the previously planned approved review archive.","risk":"danger","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"},{"key":"confirmation","label":"Confirmation","description":"Type APPLY exactly.","type":"string","required":true,"max_length":5,"pattern":"^APPLY$"}]},{"name":"cleanup-review-verify","label":"Verify review archive","description":"Verify an applied review archive.","risk":"safe","parameters":[{"key":"run_id","label":"Run ID","type":"string","required":true,"max_length":80,"pattern":"^[A-Za-z0-9._-]+$"}]}],"inventory_operations":[]}'
+}
+
+apply_config() {
+  file=$1; request_file_allowed "$file" || return 2
+  interval=$(json_uint interval "$file"); guard_log=$(json_bool guard_log "$file"); normal_sort=$(json_bool normal_sort "$file"); sort_mode=$(json_text sort_mode "$file")
+  hold=$(json_bool hold_protected "$file"); dispatcher=$(json_text dispatcher_integration "$file"); duplicate=$(json_text duplicate_mode "$file"); prefixes=$(json_text custom_park_prefixes "$file")
+  guard_max=$(json_uint guard_max_files "$file"); guard_timeout=$(json_uint guard_timeout "$file"); log_max=$(json_uint log_max_kb "$file"); temp_clean=$(json_bool guard_temp_clean "$file"); preview_max=$(json_uint preview_max_files "$file")
+  case "$interval" in ""|*[!0-9]*) return 2 ;; esac; [ "$interval" -ge 30 ] && [ "$interval" -le 86400 ] || return 2
+  case "$guard_log" in true) guard_log=1 ;; false) guard_log=0 ;; *) return 2 ;; esac
+  case "$normal_sort" in true) normal_sort=1 ;; false) normal_sort=0 ;; *) return 2 ;; esac
+  case "$sort_mode" in interval|manual|boot_once) ;; *) return 2 ;; esac
+  case "$hold" in true) hold=1 ;; false) hold=0 ;; *) return 2 ;; esac
+  case "$dispatcher" in off|auto|on) ;; *) return 2 ;; esac
+  case "$duplicate" in filename|checksum_delete_identical) ;; *) return 2 ;; esac
+  prefixes_valid "$prefixes" || return 2
+  case "$guard_max" in ""|*[!0-9]*) return 2 ;; esac; [ "$guard_max" -ge 1 ] && [ "$guard_max" -le 2000 ] || return 2
+  case "$guard_timeout" in ""|*[!0-9]*) return 2 ;; esac; [ "$guard_timeout" -ge 2 ] && [ "$guard_timeout" -le 60 ] || return 2
+  case "$log_max" in ""|*[!0-9]*) return 2 ;; esac; [ "$log_max" -ge 64 ] && [ "$log_max" -le 16384 ] || return 2
+  case "$temp_clean" in true) temp_clean=1 ;; false) temp_clean=0 ;; *) return 2 ;; esac
+  case "$preview_max" in ""|*[!0-9]*) return 2 ;; esac; [ "$preview_max" -ge 1 ] && [ "$preview_max" -le 200 ] || return 2
+
+  acquire_lock || return 1
+  trap 'release_lock' EXIT INT TERM HUP
+  stamp=$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo now)
+  cp -f "$CONFIG_FILE" "$STATE_DIR/backups/sortify.conf.$stamp" 2>/dev/null || true
+  tmp="$CONFIG_FILE.tmp.$$"
+  {
+    printf 'INTERVAL=%s\n' "$interval"
+    printf 'GUARD_LOG=%s\n' "$guard_log"
+    printf 'SORTIFY_NORMAL_SORT=%s\n' "$normal_sort"
+    printf 'SORTIFY_SORT_MODE=%s\n' "$sort_mode"
+    printf 'SORTIFY_HOLD_PROTECTED=%s\n' "$hold"
+    printf 'SORTIFY_DISPATCHER_INTEGRATION=%s\n' "$dispatcher"
+    printf 'SORTIFY_CUSTOM_PARK_PREFIXES=%s\n' "$prefixes"
+    printf 'SORTIFY_GUARD_MAX_FILES=%s\n' "$guard_max"
+    printf 'SORTIFY_GUARD_STATUS_TIMEOUT=%s\n' "$guard_timeout"
+    printf 'SORTIFY_DUPLICATE_MODE=%s\n' "$duplicate"
+    printf 'SORTIFY_LOG_MAX_KB=%s\n' "$log_max"
+    printf 'SORTIFY_GUARD_TEMP_CLEAN_ON_SORT=%s\n' "$temp_clean"
+    printf 'SORTIFY_PREVIEW_MAX_FILES=%s\n' "$preview_max"
+    printf 'SORTIFY_DISPATCHER_RUNTIME_DIR=/data/adb/ssh-drop-dispatcher\n'
+    printf 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115\n'
+    printf 'SORTIFY_DISPATCHER_RELEASE_DIR=/data/adb/ssh-drop-dispatcher/integration/sortify-release\n'
+  } > "$tmp" || return 1
+  chmod 0600 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$CONFIG_FILE" || return 1
+  trap - EXIT INT TERM HUP; release_lock
+  printf '{"ok":true,"config":%s}\n' "$(config_json)"
+}
+
+action_result() {
+  name=$1; shift
+  tmp="$RUNTIME_DIR/action.$$"; rm -f "$tmp"
+  run_domain "$@" > "$tmp" 2>&1; rc=$?
+  output=$(cat "$tmp" 2>/dev/null || true); rm -f "$tmp"
+  printf '{"ok":%s,"action":' "$([ "$rc" -eq 0 ] && echo true || echo false)"; json_string "$name"; printf ',"message":'; json_string "$output"; printf '}\n'
+  return "$rc"
+}
+
+run_action_file() {
+  name=$1; file=$2; request_file_allowed "$file" || return 2
+  dry_run=$(json_bool dry_run "$file"); [ -n "$dry_run" ] || dry_run=false
+  case "$dry_run" in true|false) ;; *) return 2 ;; esac
+  case "$name" in
+    sort-now) [ "$dry_run" = true ] && action_result "$name" --preview-sort || action_result "$name" --sort ;;
+    guard-status) [ "$dry_run" = false ] || return 2; action_result "$name" --guard-status ;;
+    guard-clean) [ "$dry_run" = false ] || return 2; action_result "$name" --guard-clean ;;
+    guard-temp-clean) [ "$dry_run" = false ] || return 2; action_result "$name" --guard-temp-clean ;;
+    dispatcher-status) [ "$dry_run" = false ] || return 2; action_result "$name" --dispatcher-status ;;
+    contract-smoke) [ "$dry_run" = false ] || return 2; action_result "$name" --contract-smoke ;;
+    log-rotate) [ "$dry_run" = false ] || return 2; action_result "$name" --log-rotate ;;
+    *) return 2 ;;
+  esac
+}
+
+run_job() {
+  case "$1" in
+    cleanup-scan) run_domain --cleanup-scan ;;
+    config-export) run_domain --config-export ;;
+    *) return 2 ;;
+  esac
+}
+
+filename_safe() { value=$1; [ -n "$value" ] && [ "${#value}" -le 255 ] && case "$value" in */*|*\\*) return 1 ;; *) return 0 ;; esac; }
+run_id_safe() { value=$1; [ -n "$value" ] && [ "${#value}" -le 80 ] && printf '%s' "$value" | grep -Eq '^[A-Za-z0-9._-]+$'; }
+
+run_typed_job() {
+  job=$1; file=$2; request_file_allowed "$file" || return 2
+  filename=$(json_text filename "$file"); run_id=$(json_text run_id "$file"); confirmation=$(json_text confirmation "$file")
+  case "$job" in
+    test-filename) filename_safe "$filename" || return 2; run_domain --test-filename "$filename" ;;
+    explain-route) filename_safe "$filename" || return 2; run_domain --explain-route "$filename" ;;
+    marker-status) filename_safe "$filename" || return 2; run_domain --marker-status "$filename" ;;
+    cleanup-guard) run_id_safe "$run_id" || return 2; run_domain --cleanup-guard "$run_id" ;;
+    cleanup-verify) run_id_safe "$run_id" || return 2; run_domain --cleanup-verify "$run_id" ;;
+    cleanup-rollback-info) run_id_safe "$run_id" || return 2; run_domain --cleanup-rollback-info "$run_id" ;;
+    cleanup-archive-safe) run_id_safe "$run_id" || return 2; [ "$confirmation" = ARCHIVE_SAFE ] || return 2; SORTIFY_WEBUI_ARCHIVE_SAFE=yes run_domain --cleanup-archive-safe "$run_id" ;;
+    cleanup-review-dry-run) run_id_safe "$run_id" || return 2; [ "$confirmation" = APPROVE ] || return 2; SORTIFY_WEBUI_APPROVE_REVIEW_DRY_RUN=yes run_domain --cleanup-review-dry-run "$run_id" ;;
+    cleanup-review-apply) run_id_safe "$run_id" || return 2; [ "$confirmation" = APPLY ] || return 2; SORTIFY_WEBUI_APPLY_REVIEW_ARCHIVE=yes run_domain --cleanup-review-apply "$run_id" ;;
+    cleanup-review-verify) run_id_safe "$run_id" || return 2; run_domain --cleanup-review-verify "$run_id" ;;
+    *) return 2 ;;
+  esac
+}
+
+kv_from_output() { printf '%s\n' "$1" | sed -n "s/^$2=//p" | head -n 1; }
+
+print_status() {
+  mode=$(enum_value SORTIFY_SORT_MODE interval 'interval manual boot_once')
+  normal=$(bool_value SORTIFY_NORMAL_SORT 1)
+  hold=$(bool_value SORTIFY_HOLD_PROTECTED 1)
+  integration=$(enum_value SORTIFY_DISPATCHER_INTEGRATION auto 'off auto on')
+  dispatcher=$(run_domain --dispatcher-status 2>/dev/null || true)
+  integration_state=$(kv_from_output "$dispatcher" dispatcher_integration_state); [ -n "$integration_state" ] || integration_state=unknown
+  normal_text=enabled; normal_level=good; [ "$normal" = 1 ] || { normal_text=disabled; normal_level=caution; }
+  hold_text=enabled; hold_level=good; [ "$hold" = 1 ] || { hold_text=disabled; hold_level=danger; }
+  printf '{"ok":true,"module":{"id":"sortify","name":'; json_string "${MODULE_NAME:-Sortify Dispatch}"; printf ',"version":'; json_string "${MODULE_VERSION:-unknown}"; printf '},"config":%s,' "$(config_json)"
+  printf '"summary":[{"label":"Sort mode","value":'; json_string "$mode"; printf ',"level":"muted"},{"label":"Normal sorting","value":"%s","level":"%s"},{"label":"Protected hold","value":"%s","level":"%s"},{"label":"SDD link","value":' "$normal_text" "$normal_level" "$hold_text" "$hold_level"; json_string "$integration_state"; printf ',"level":"%s"},{"label":"SDD policy","value":"v4115","level":"good"}],' "$([ "$integration_state" = required_missing ] && echo danger || echo muted)"
+  printf '"runtime":{"state_dir":'; json_string "$STATE_DIR"; printf ',"config_file":'; json_string "$CONFIG_FILE"; printf ',"dispatcher_integration":'; json_string "$integration"; printf ',"dispatcher_state":'; json_string "$integration_state"; printf ',"config_migrated":true},'
+  printf '"action_state":{"active":[],"blocked":{'
+  first=1
+  if [ "$normal" != 1 ]; then printf '"sort-now":"Normal sorting is disabled in Settings."'; first=0; fi
+  if [ "$integration" = on ] && [ "$integration_state" = required_missing ]; then [ "$first" = 1 ] || printf ','; printf '"sort-now":"SDD integration is required but not healthy."'; fi
+  printf '}},"safety":{"loopback_only":true,"arbitrary_shell_blocked":true,"arbitrary_path_input_blocked":true,"sdd_policy_v4115":true,"sdd_marker_write_absent":true,"host_run_absent":true,"webui_boot_dependency_absent":true}}\n'
+}
+
+print_inventory() {
+  name=$1
+  case "$name" in
+    guard) out=$(run_domain --guard-status 2>/dev/null || true); state=$(kv_from_output "$out" guard_status); protected=$(kv_from_output "$out" protected_in_download); misplaced=$(kv_from_output "$out" protected_misplaced); printf '{"ok":true,"name":"guard","columns":["state","protected_in_download","misplaced"],"items":[{"state":'; json_string "${state:-unknown}"; printf ',"protected_in_download":'; json_string "${protected:-unknown}"; printf ',"misplaced":'; json_string "${misplaced:-unknown}"; printf '}]}\n' ;;
+    dispatcher) out=$(run_domain --dispatcher-status 2>/dev/null || true); state=$(kv_from_output "$out" dispatcher_integration_state); present=$(kv_from_output "$out" dispatcher_runtime_present); printf '{"ok":true,"name":"dispatcher","columns":["state","runtime_present","policy"],"items":[{"state":'; json_string "${state:-unknown}"; printf ',"runtime_present":'; json_string "${present:-unknown}"; printf ',"policy":"v4115"}]}\n' ;;
+    cleanup) out=$(run_domain --cleanup-status 2>/dev/null || true); present=$(kv_from_output "$out" cleanup_tool_present); printf '{"ok":true,"name":"cleanup","columns":["tool_present","manual_only","sdd_marker_write"],"items":[{"tool_present":'; json_string "${present:-no}"; printf ',"manual_only":"yes","sdd_marker_write":"no"}]}\n' ;;
+    *) return 2 ;;
+  esac
+}
+
+case "${1:-}" in
+  capabilities) [ "$#" -eq 1 ] || exit 2; print_capabilities ;;
+  capabilities-v04) [ "$#" -eq 1 ] || exit 2; print_v04_capabilities ;;
+  status) [ "$#" -eq 1 ] || exit 2; print_status ;;
+  config-get) [ "$#" -eq 1 ] || exit 2; printf '%s\n' "$(config_json)" ;;
+  config-apply) [ "$#" -eq 2 ] || exit 2; apply_config "$2" ;;
+  log)
+    lines=${2:-200}; case "$lines" in ""|*[!0-9]*) exit 2 ;; esac; [ "$lines" -ge 1 ] && [ "$lines" -le 1000 ] || exit 2
+    echo '== sortify.log =='; [ -f "$DEST_BASE/sortify.log" ] && tail -n "$lines" "$DEST_BASE/sortify.log" || true
+    echo '== guard.log =='; [ -f "$DEST_BASE/guard.log" ] && tail -n "$lines" "$DEST_BASE/guard.log" || true
+    ;;
+  action-file) [ "$#" -eq 3 ] || exit 2; run_action_file "$2" "$3" ;;
+  job-run) [ "$#" -eq 2 ] || exit 2; run_job "$2" ;;
+  job-run-file) [ "$#" -eq 3 ] || exit 2; run_typed_job "$2" "$3" ;;
+  inventory) [ "$#" -eq 2 ] || exit 2; print_inventory "$2" ;;
+  *) echo '{"ok":false,"error":"unsupported operation"}' >&2; exit 2 ;;
+esac

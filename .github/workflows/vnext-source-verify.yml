@@ -1,0 +1,44 @@
+name: Sortify vNext source verify
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/vnext-source-verify.yml'
+      - '.gitmodules'
+      - '.webui-core'
+      - 'webui.lock'
+      - 'module/**'
+      - 'tools/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Sortify with pinned WebUI Core
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go from pinned Core
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: .webui-core/go.mod
+          cache: false
+
+      - name: Verify source contracts
+        shell: bash
+        run: bash ./tools/test-vnext.sh --source-only
+
+      - name: Build deterministic candidate
+        shell: bash
+        run: bash ./tools/build-release.sh
+
+      - name: Verify repository remains clean
+        shell: bash
+        run: git diff --exit-code

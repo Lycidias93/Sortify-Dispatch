@@ -1,0 +1,15 @@
+schema=sortify-dispatch-webui-core-lock-v1
+template_repository=Lycidias93/android-root-module-webui-template
+template_commit=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb
+core_version=0.6.1
+core_manifest_sha256=f9833a3759f00b2f7d6de3f2cdd189d16c8847362a381c2beea46a814d246349
+consumption_model=pinned_gitlink_build_stage_sync
+browser_transport=loopback_only
+bootstrap=one_time_token_to_httponly_cookie
+embedded_host=bounded_launcher_redirect
+javascript_shell_exec=forbidden_except_fixed_embedded_launcher
+arbitrary_path_input=forbidden
+persistent_config=/data/adb/sortify/sortify.conf
+sdd_required_policy=v4115
+sdd_marker_write=no
+boot_dependency=no

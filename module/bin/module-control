@@ -1,0 +1,27 @@
+#!/system/bin/sh
+set -u
+umask 077
+
+BINDIR=${0%/*}
+MODDIR=${MODULE_DIR:-${BINDIR%/bin}}
+BASE="$BINDIR/module-control-base"
+STATE_DIR=${MODULE_STATE_DIR:-/data/adb/sortify}
+CONFIG_FILE=${SORTIFY_CONFIG_FILE:-$STATE_DIR/sortify.conf}
+LEGACY_MIRROR=${SORTIFY_LEGACY_MIRROR:-$MODDIR/sortify.conf}
+
+[ -x "$BASE" ] || { echo '{"ok":false,"error":"Sortify module-control base unavailable"}' >&2; exit 69; }
+
+sh "$BASE" "$@"
+rc=$?
+
+if [ -f "$CONFIG_FILE" ]; then
+  if ! cmp -s "$CONFIG_FILE" "$LEGACY_MIRROR" 2>/dev/null; then
+    tmp="$LEGACY_MIRROR.tmp.$$"
+    if cp -f "$CONFIG_FILE" "$tmp" 2>/dev/null; then
+      chmod 0600 "$tmp" 2>/dev/null || true
+      mv -f "$tmp" "$LEGACY_MIRROR" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+    fi
+  fi
+fi
+
+exit "$rc"
