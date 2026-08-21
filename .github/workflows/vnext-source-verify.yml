@@ -42,3 +42,13 @@ jobs:
       - name: Verify repository remains clean
         shell: bash
         run: git diff --exit-code
+
+      - name: Upload installable candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sortify-Dispatch-4.8.0-vnext-core061
+          path: |
+            dist/Sortify-Dispatch-4.8.0-vnext-core061.zip
+            dist/build-manifest.json
+          if-no-files-found: error
+          retention-days: 14
