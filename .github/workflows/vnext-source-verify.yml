@@ -20,13 +20,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout Sortify with pinned WebUI Core
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Set up Go from pinned Core
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: .webui-core/go.mod
           cache: false
