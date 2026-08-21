@@ -14,7 +14,7 @@ fi
 [[ "$(git -C "$CORE" rev-parse HEAD)" == "$CORE_COMMIT" ]] || { echo "webui_core_commit_mismatch"; exit 1; }
 [[ "$(tr -d '\r\n' < "$CORE/CORE_VERSION")" == "$CORE_VERSION" ]] || { echo "webui_core_version_mismatch"; exit 1; }
 
-"$ROOT/tools/test-vnext.sh" --source-only
+bash "$ROOT/tools/test-vnext.sh" --source-only
 
 VERSION=$(sed -n 's/^version=//p' "$MODULE_SRC/module.prop" | head -n1)
 [[ -n "$VERSION" ]] || { echo "module_version_missing"; exit 1; }
