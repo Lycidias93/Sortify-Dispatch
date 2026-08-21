@@ -1,69 +1,43 @@
 #!/system/bin/sh
-# Sortify v4.0 Service (Native WebUI Version)
+set -u
 
 MODDIR=${0%/*}
-CONF="$MODDIR/sortify.conf"
-LOG="$MODDIR/sortify.log"
+STATE_DIR=/data/adb/sortify
+CONFIG_FILE=$STATE_DIR/sortify.conf
+DEFAULT_CONFIG=$MODDIR/config/sortify.conf.default
+DOMAIN=$MODDIR/bin/sortify-domain
 
-# 1. Load Defaults if config missing
-if [ ! -f "$CONF" ]; then
-    {
-        echo "INTERVAL=300"
-        echo "GUARD_LOG=1"
-        echo "SORTIFY_DISPATCHER_INTEGRATION=auto"
-        echo "SORTIFY_HOLD_PROTECTED=1"
-        echo "SORTIFY_NORMAL_SORT=1"
-        echo "SORTIFY_SORT_MODE=interval"
-        echo "SORTIFY_DISPATCHER_RUNTIME_DIR=/data/adb/ssh-drop-dispatcher"
-        echo "SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115"
-        echo "SORTIFY_DISPATCHER_RELEASE_DIR=/data/adb/ssh-drop-dispatcher/integration/sortify-release"
-    } > "$CONF"
+mkdir -p "$STATE_DIR" >/dev/null 2>&1 || exit 1
+chmod 0700 "$STATE_DIR" >/dev/null 2>&1 || true
+if [ ! -f "$CONFIG_FILE" ] && [ -f "$DEFAULT_CONFIG" ]; then
+  tmp="$CONFIG_FILE.tmp.$$"
+  cp -f "$DEFAULT_CONFIG" "$tmp" || exit 1
+  chmod 0600 "$tmp" >/dev/null 2>&1 || true
+  mv -f "$tmp" "$CONFIG_FILE" || exit 1
 fi
 
-# (WebUI is now handled natively by KernelSU via 'webroot' folder. No httpd needed.)
-
-# 2. Wait for Storage
-wait_until_storage() {
-    until [ -d "/sdcard/Download" ]; do
-        sleep 10
-    done
+wait_boot() {
+  count=0
+  while [ "$count" -lt 120 ]; do
+    [ "$(getprop sys.boot_completed 2>/dev/null)" = "1" ] && return 0
+    count=$((count + 1))
+    sleep 2
+  done
+  return 0
 }
-wait_until_storage
 
-# 3. Main Loop (Backgrounded)
-(
-    while true; do
-        # Re-read config every cycle to get new INTERVAL
-        if [ -f "$CONF" ]; then
-            . "$CONF"
-        fi
+interval_seconds() {
+  value=$(sed -n 's/^INTERVAL=//p' "$CONFIG_FILE" 2>/dev/null | tail -n 1)
+  case "$value" in ""|*[!0-9]*) value=300 ;; esac
+  [ "$value" -ge 30 ] 2>/dev/null || value=300
+  [ "$value" -le 86400 ] 2>/dev/null || value=86400
+  printf '%s' "$value"
+}
 
-        # SORTIFY_SERVICE_CONFIG_SANITIZE_V1_START
-        case "${INTERVAL:-300}" in
-            ''|*[!0-9]*) INTERVAL=300 ;;
-        esac
-        [ "$INTERVAL" -lt 30 ] 2>/dev/null && INTERVAL=30
-        case "${GUARD_LOG:-1}" in 0|1) ;; *) GUARD_LOG=1 ;; esac
-        case "${SORTIFY_DISPATCHER_INTEGRATION:-auto}" in off|auto|on) ;; *) SORTIFY_DISPATCHER_INTEGRATION=auto ;; esac
-        case "${SORTIFY_HOLD_PROTECTED:-1}" in 0|1) ;; *) SORTIFY_HOLD_PROTECTED=1 ;; esac
-        case "${SORTIFY_NORMAL_SORT:-1}" in 0|1) ;; *) SORTIFY_NORMAL_SORT=1 ;; esac
-        case "${SORTIFY_SORT_MODE:-interval}" in interval|manual|boot_once) ;; *) SORTIFY_SORT_MODE=interval ;; esac
-        SORTIFY_DISPATCHER_RUNTIME_DIR="${SORTIFY_DISPATCHER_RUNTIME_DIR:-/data/adb/ssh-drop-dispatcher}"
-        SORTIFY_DISPATCHER_REQUIRED_POLICY="${SORTIFY_DISPATCHER_REQUIRED_POLICY:-v4115}"
-        SORTIFY_DISPATCHER_RELEASE_DIR="${SORTIFY_DISPATCHER_RELEASE_DIR:-$SORTIFY_DISPATCHER_RUNTIME_DIR/integration/sortify-release}"
-        export INTERVAL GUARD_LOG SORTIFY_DISPATCHER_INTEGRATION SORTIFY_HOLD_PROTECTED SORTIFY_NORMAL_SORT SORTIFY_SORT_MODE SORTIFY_DISPATCHER_RUNTIME_DIR SORTIFY_DISPATCHER_REQUIRED_POLICY SORTIFY_DISPATCHER_RELEASE_DIR
-        # SORTIFY_SERVICE_CONFIG_SANITIZE_V1_END
-
-        # Run the action script
-        # We redirect stdout/stderr to log to capture any 'echo' from action.sh
-        sh "$MODDIR/action.sh" --service-cycle >> "$LOG" 2>&1
-        
-        # Log the service heartbeat
-        echo "[Service] $(date '+%Y-%m-%d %H:%M:%S') - Cycle complete mode ${SORTIFY_SORT_MODE:-interval}. Sleeping ${INTERVAL}s" >> "$LOG"
-        
-        # Prune log (Keep last 200 lines)
-        tail -n 200 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
-        
-        sleep "${INTERVAL:-300}"
-    done
-) &  # <--- CRITICAL: Run entire loop in background
+wait_boot
+while true; do
+  if [ -x "$DOMAIN" ]; then
+    MODULE_DIR="$MODDIR" CONF_PATH="$CONFIG_FILE" sh "$DOMAIN" --service-cycle >/dev/null 2>&1 || true
+  fi
+  sleep "$(interval_seconds)"
+done
