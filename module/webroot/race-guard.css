@@ -1,0 +1,12 @@
+html[data-webui-status-ready="false"] #saveConfigButton,
+html[data-webui-status-ready="false"] #actionCards button,
+html[data-webui-status-ready="false"] #jobLaunchers button,
+html[data-webui-status-ready="false"] [data-webui-mutation],
+html[data-webui-mutation-busy="true"] #saveConfigButton,
+html[data-webui-mutation-busy="true"] #actionCards button,
+html[data-webui-mutation-busy="true"] #jobLaunchers button,
+html[data-webui-mutation-busy="true"] [data-webui-mutation] {
+  pointer-events: none;
+  opacity: .55;
+  cursor: wait;
+}
