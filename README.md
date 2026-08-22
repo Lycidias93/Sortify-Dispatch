@@ -1,3 +1,14 @@
+<!-- SORTIFY_DISPATCH_V480_CORE061_README_START -->
+## Sortify Dispatch 4.8.0
+
+Current release: `4.8.0-vnext-core061-r1`.
+
+Sortify now uses shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and automatic upgrade migration. The WebUI can open in the default browser or through compatible embedded hosts using the same authenticated loopback session.
+
+Custom park prefixes remain available under Settings as local-hold-only prefixes. SSH Drop Dispatcher compatibility remains on policy `v4115`.
+
+Install `Sortify-Dispatch-4.8.0-vnext-core061-r1.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
+<!-- SORTIFY_DISPATCH_V480_CORE061_README_END -->
 <!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_START -->
 ## Sortify Dispatch v4.7.1-webui-cleanup-hotfix
 
@@ -185,7 +196,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.7.0-download-cleanup-integration
+**Version:** 4.8.0-vnext-core061-r1
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -226,7 +237,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-v4.7.0-download-cleanup-integration.zip` from Releases.
+1. Download `Sortify-Dispatch-4.8.0-vnext-core061-r1.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.
@@ -239,7 +250,7 @@ su -c sh /data/adb/modules/sortify/action.sh
 
 ## WebUI
 
-KernelSU WebUI can configure the interval, toggle guard logging, run guard status, run safe guard clean, show dispatcher link status, and trigger a manual sort.
+The shared WebUI Core 0.6.1 provides typed Settings, Actions, Jobs and Inventory views through an authenticated loopback session. It can open from the module Action button in the default browser or through compatible embedded WebUI hosts.
 
 ## Online updates
 
@@ -255,7 +266,7 @@ The visible module name is `Sortify Dispatch`, but the module ID remains `sortif
 
 ## Release integrity
 
-Each release ZIP is published with a SHA256 checksum.
+Release ZIPs are published through GitHub Releases.
 
 ## Changelog
 
@@ -285,7 +296,7 @@ vNext design target:
 
 Source implementation date: `2026-05-17`.
 
-Config file: `/data/adb/modules/sortify/sortify.conf`
+Config file: `/data/adb/sortify/sortify.conf`
 
 Available flags:
 

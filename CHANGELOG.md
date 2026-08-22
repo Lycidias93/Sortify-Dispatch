@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V480_CORE061_START -->
+## 4.8.0 - Shared WebUI Core and persistent settings
+
+- Moved Sortify to shared WebUI Core 0.6.1 with default-browser and compatible embedded-host launch through the same authenticated local session.
+- Consolidated settings into a typed WebUI and added a configurable Preview file limit while preserving existing options such as custom park prefixes.
+- Moved live configuration to persistent `/data/adb/sortify` state so settings survive module replacement and upgrade cleanly.
+- Fixed upgrade/install handling for the WebUI executable and migrated configuration.
+- Moved filename, route, marker and guarded Download Cleanup operations to typed WebUI actions instead of browser-built shell commands.
+- Made uninstall preserve Sortify data and configuration by default and avoid broad process-name termination.
+<!-- SORTIFY_DISPATCH_V480_CORE061_END -->
 <!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_CHANGELOG_START -->
 ## 4.7.1-webui-cleanup-hotfix - WebUI cleanup/status hotfix
 
