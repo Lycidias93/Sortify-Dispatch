@@ -1,0 +1,99 @@
+name: Sortify 4.8.0 public release
+
+on:
+  push:
+    branches:
+      - 'repo-maintenance/sortify-v480-public-release-20260822'
+    paths:
+      - '.github/workflows/public-release-v480.yml'
+      - 'release-promotions/RELEASE_NOTES_v4.8.0-vnext-core061-r1.md'
+      - 'release-promotions/v4.8.0-vnext-core061-r1.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout accepted Sortify release controller
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go from pinned WebUI Core
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: .webui-core/go.mod
+          cache: false
+
+      - name: Bind release to accepted Sortify and WebUI Core payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=6ecbb97c6a94f15188681e5f59491825470081c4
+          core=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb
+          test "$(git -C .webui-core rev-parse HEAD)" = "$core"
+          git -C .webui-core fetch --force origin "refs/tags/v0.6.1:refs/tags/v0.6.1"
+          test "$(git -C .webui-core rev-list -n 1 v0.6.1)" = "$core"
+          test "$(tr -d '\r\n' < .webui-core/CORE_VERSION)" = "0.6.1"
+          grep -qx 'template_commit=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb' webui.lock
+          grep -qx 'core_version=0.6.1' webui.lock
+          git diff --exit-code "$target" -- \
+            .gitmodules .webui-core webui.lock module \
+            tools/build-release.sh tools/package-vnext.py tools/test-vnext.sh tools/sortify-download-cleanup.sh
+          echo "sortify_release_target=$target"
+          echo "webui_core_release=v0.6.1"
+          echo "release_payload_delta=none"
+
+      - name: Verify source contracts and build deterministic release ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ./tools/test-vnext.sh --source-only
+          bash ./tools/build-release.sh
+          zip=dist/Sortify-Dispatch-4.8.0-vnext-core061-r1.zip
+          expected=becea3a888d6ceabb193cc3d099055f62c4884dedbb563a1aac59b9b0d3c0f67
+          test -s "$zip"
+          actual="$(sha256sum "$zip" | awk '{print $1}')"
+          test "$actual" = "$expected"
+          grep -q '"version": "4.8.0-vnext-core061-r1"' dist/build-manifest.json
+          grep -q '"webui_core_version": "0.6.1"' dist/build-manifest.json
+          grep -q '"webui_core_commit": "6fbd1b018a45fe5b1bebba7aeb9142423eab47fb"' dist/build-manifest.json
+          echo "release_zip_sha256=$actual"
+
+      - name: Publish and re-download exact GitHub release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=v4.8.0-vnext-core061-r1
+          target=6ecbb97c6a94f15188681e5f59491825470081c4
+          asset=Sortify-Dispatch-4.8.0-vnext-core061-r1.zip
+          zip="dist/$asset"
+          expected=becea3a888d6ceabb193cc3d099055f62c4884dedbb563a1aac59b9b0d3c0f67
+          notes=release-promotions/RELEASE_NOTES_v4.8.0-vnext-core061-r1.md
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release_state=already_present"
+          else
+            gh release create "$tag" "$zip" \
+              --target "$target" \
+              --title "Sortify Dispatch 4.8.0" \
+              --notes-file "$notes"
+            echo "release_state=created"
+          fi
+          git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git rev-list -n 1 "$tag")" = "$target"
+          rm -rf release-verify
+          mkdir -p release-verify
+          gh release download "$tag" --pattern "$asset" --dir release-verify --clobber
+          actual="$(sha256sum "release-verify/$asset" | awk '{print $1}')"
+          test "$actual" = "$expected"
+          test "$(gh release view "$tag" --json isDraft --jq '.isDraft')" = "false"
+          test "$(gh release view "$tag" --json isPrerelease --jq '.isPrerelease')" = "false"
+          gh release view "$tag" --json tagName,url --jq '.tagName + " " + .url'
+          echo "public_asset_sha256=$actual"
+          echo "RESULT: SORTIFY_V480_PUBLIC_RELEASE_DONE outcome=success workflow_exit_code=0"
