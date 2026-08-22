@@ -1,0 +1,156 @@
+name: Sortify 4.8.0 stable channel promotion
+
+on:
+  push:
+    branches:
+      - 'repo-maintenance/sortify-v480-stable-channel-20260822'
+    paths:
+      - '.github/workflows/promote-v480-stable-channel.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  promote-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout promotion branch
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify accepted public releases and exact payloads
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sortify_tag=v4.8.0-vnext-core061-r1
+          sortify_target=6ecbb97c6a94f15188681e5f59491825470081c4
+          core_tag=v0.6.1
+          core_target=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb
+          asset=Sortify-Dispatch-4.8.0-vnext-core061-r1.zip
+          expected=becea3a888d6ceabb193cc3d099055f62c4884dedbb563a1aac59b9b0d3c0f67
+
+          git fetch --force origin "refs/tags/$sortify_tag:refs/tags/$sortify_tag"
+          test "$(git rev-list -n 1 "$sortify_tag")" = "$sortify_target"
+          test "$(gh release view "$sortify_tag" --json isDraft --jq '.isDraft')" = false
+          test "$(gh release view "$sortify_tag" --json isPrerelease --jq '.isPrerelease')" = false
+          rm -rf release-verify && mkdir release-verify
+          gh release download "$sortify_tag" --pattern "$asset" --dir release-verify --clobber
+          test "$(sha256sum "release-verify/$asset" | awk '{print $1}')" = "$expected"
+
+          git ls-remote https://github.com/Lycidias93/android-root-module-webui-template.git "refs/tags/$core_tag" | awk '{print $1}' | grep -qx "$core_target"
+          grep -qx 'template_commit=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb' webui.lock
+          grep -qx 'core_version=0.6.1' webui.lock
+
+      - name: Promote update channel and user-facing docs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          notes = '''# Sortify Dispatch 4.8.0
+
+          ## What changed
+
+          - Moved the WebUI to shared WebUI Core 0.6.1. Sortify can open in the default browser or through compatible KsuWebUI-style embedded hosts while using the same authenticated local loopback session.
+          - Consolidated settings into a typed WebUI surface and added the configurable Preview file limit while keeping existing Sortify options, including custom park prefixes.
+          - Moved active configuration to persistent state under `/data/adb/sortify` so settings survive module replacement. Existing configuration is preserved and completed with safe defaults during upgrade.
+          - Fixed upgrade/install handling so the WebUI server remains executable after installation and the migrated configuration is normalized before the module starts.
+          - Exposed filename testing, route explanation, marker status and guarded Download Cleanup operations through typed WebUI actions instead of browser-built shell commands.
+          - Made uninstall behavior safer by avoiding broad process-name termination and preserving Sortify data and persistent configuration by default.
+
+          ## Compatibility
+
+          SSH Drop Dispatcher integration continues to use the existing `v4115` release-marker contract. Sortify does not add SDD target administration, SSH-key handling or Return Channel administration. Custom park prefixes remain local-hold only; `target-` and `targets-` remain reserved for dispatcher routing.
+
+          ## Update
+
+          Install the release ZIP with your Magisk/KernelSU-compatible module manager and reboot once. Existing Sortify settings are migrated automatically.
+          '''
+          notes = '\n'.join(line[10:] if line.startswith('          ') else line for line in notes.splitlines()).strip() + '\n'
+          Path('RELEASE_NOTES_v4.8.0-vnext-core061-r1.md').write_text(notes)
+
+          update = {
+              'version': '4.8.0-vnext-core061-r1',
+              'versionCode': 27,
+              'zipUrl': 'https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.0-vnext-core061-r1/Sortify-Dispatch-4.8.0-vnext-core061-r1.zip',
+              'changelog': 'https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.0-vnext-core061-r1.md',
+          }
+          Path('update.json').write_text(json.dumps(update, indent=2) + '\n')
+
+          changelog = Path('CHANGELOG.md').read_text()
+          marker = '<!-- SORTIFY_DISPATCH_V480_CORE061_START -->'
+          block = '''<!-- SORTIFY_DISPATCH_V480_CORE061_START -->
+          ## 4.8.0 - Shared WebUI Core and persistent settings
+
+          - Moved Sortify to shared WebUI Core 0.6.1 with default-browser and compatible embedded-host launch through the same authenticated local session.
+          - Consolidated settings into a typed WebUI and added a configurable Preview file limit while preserving existing options such as custom park prefixes.
+          - Moved live configuration to persistent `/data/adb/sortify` state so settings survive module replacement and upgrade cleanly.
+          - Fixed upgrade/install handling for the WebUI executable and migrated configuration.
+          - Moved filename, route, marker and guarded Download Cleanup operations to typed WebUI actions instead of browser-built shell commands.
+          - Made uninstall preserve Sortify data and configuration by default and avoid broad process-name termination.
+          <!-- SORTIFY_DISPATCH_V480_CORE061_END -->
+
+          '''
+          block = '\n'.join(line[10:] if line.startswith('          ') else line for line in block.splitlines())
+          if marker not in changelog:
+              changelog = block + changelog
+          Path('CHANGELOG.md').write_text(changelog)
+
+          readme_path = Path('README.md')
+          readme = readme_path.read_text()
+          readme_marker = '<!-- SORTIFY_DISPATCH_V480_CORE061_README_START -->'
+          readme_block = '''<!-- SORTIFY_DISPATCH_V480_CORE061_README_START -->
+          ## Sortify Dispatch 4.8.0
+
+          Current release: `4.8.0-vnext-core061-r1`.
+
+          Sortify now uses shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and automatic upgrade migration. The WebUI can open in the default browser or through compatible embedded hosts using the same authenticated loopback session.
+
+          Custom park prefixes remain available under Settings as local-hold-only prefixes. SSH Drop Dispatcher compatibility remains on policy `v4115`.
+
+          Install `Sortify-Dispatch-4.8.0-vnext-core061-r1.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
+          <!-- SORTIFY_DISPATCH_V480_CORE061_README_END -->
+
+          '''
+          readme_block = '\n'.join(line[10:] if line.startswith('          ') else line for line in readme_block.splitlines())
+          if readme_marker not in readme:
+              readme = readme_block + readme
+
+          replacements = {
+              '**Version:** 4.7.0-download-cleanup-integration': '**Version:** 4.8.0-vnext-core061-r1',
+              '1. Download `Sortify-Dispatch-v4.7.0-download-cleanup-integration.zip` from Releases.': '1. Download `Sortify-Dispatch-4.8.0-vnext-core061-r1.zip` from Releases.',
+              'KernelSU WebUI can configure the interval, toggle guard logging, run guard status, run safe guard clean, show dispatcher link status, and trigger a manual sort.': 'The shared WebUI Core 0.6.1 provides typed Settings, Actions, Jobs and Inventory views through an authenticated loopback session. It can open from the module Action button in the default browser or through compatible embedded WebUI hosts.',
+              'Config file: `/data/adb/modules/sortify/sortify.conf`': 'Config file: `/data/adb/sortify/sortify.conf`',
+              'Each release ZIP is published with a SHA256 checksum.': 'Release ZIPs are published through GitHub Releases.',
+          }
+          for old, new in replacements.items():
+              if old not in readme:
+                  raise SystemExit(f'missing expected README anchor: {old}')
+              readme = readme.replace(old, new, 1)
+          readme_path.write_text(readme)
+          PY
+
+          python3 -m json.tool update.json >/dev/null
+          grep -q '^## 4.8.0 - Shared WebUI Core and persistent settings$' CHANGELOG.md
+          grep -q '^## Sortify Dispatch 4.8.0$' README.md
+          grep -q '^\*\*Version:\*\* 4.8.0-vnext-core061-r1$' README.md
+          grep -q '/data/adb/sortify/sortify.conf' README.md
+          test -s RELEASE_NOTES_v4.8.0-vnext-core061-r1.md
+
+      - name: Commit stable-channel metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/promote-v480-stable-channel.yml
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add README.md CHANGELOG.md update.json RELEASE_NOTES_v4.8.0-vnext-core061-r1.md .github/workflows/promote-v480-stable-channel.yml
+          git commit -m 'Promote Sortify 4.8.0 to stable update channel'
+          git push origin HEAD:repo-maintenance/sortify-v480-stable-channel-20260822
+          echo 'RESULT: SORTIFY_V480_STABLE_CHANNEL_METADATA_DONE outcome=success workflow_exit_code=0'
