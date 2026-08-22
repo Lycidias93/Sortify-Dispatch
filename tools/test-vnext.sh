@@ -33,6 +33,8 @@ python3 -m py_compile "$ROOT/tools/package-vnext.py"
 grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_PREVIEW_MAX_FILES=50' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/bin/module-control-base"
+grep -Fq 'sh "$CONTROL_BASE" config-get' "$ROOT/module/customize.sh"
+grep -Fq 'set_perm "$MODPATH/bin/webui-server-arm64" 0 0 0755' "$ROOT/module/customize.sh"
 
 if [[ -d "$CORE/.git" || -f "$CORE/.git" ]]; then
   [[ "$(git -C "$CORE" rev-parse HEAD)" == "$CORE_COMMIT" ]]
@@ -64,6 +66,33 @@ assert status['safety']['sdd_policy_v4115'] is True
 PY
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
 
+# Representative stable/legacy config: preserve existing values while adding
+# every vNext-owned field during normalization.
+mkdir -p "$TMP/legacy-migration-state" "$TMP/legacy-migration-runtime" "$TMP/legacy-migration-mirror"
+cat > "$TMP/legacy-migration-state/sortify.conf" <<'EOF'
+INTERVAL=600
+GUARD_LOG=1
+SORTIFY_NORMAL_SORT=1
+SORTIFY_SORT_MODE=manual
+SORTIFY_HOLD_PROTECTED=1
+SORTIFY_DISPATCHER_INTEGRATION=auto
+SORTIFY_CUSTOM_PARK_PREFIXES=heimnetz__
+SORTIFY_GUARD_MAX_FILES=450
+SORTIFY_GUARD_STATUS_TIMEOUT=10
+SORTIFY_DUPLICATE_MODE=filename
+SORTIFY_LOG_MAX_KB=2048
+SORTIFY_GUARD_TEMP_CLEAN_ON_SORT=1
+EOF
+LEGACY_ENV=(MODULE_DIR="$ROOT/module" MODULE_STATE_DIR="$TMP/legacy-migration-state" WEBUI_RUNTIME_DIR="$TMP/legacy-migration-runtime" SORTIFY_LEGACY_MIRROR="$TMP/legacy-migration-mirror/sortify.conf")
+env "${LEGACY_ENV[@]}" sh "$ROOT/module/bin/module-control" config-get > "$TMP/legacy-migration.json"
+grep -Fxq 'INTERVAL=600' "$TMP/legacy-migration-state/sortify.conf"
+grep -Fxq 'SORTIFY_SORT_MODE=manual' "$TMP/legacy-migration-state/sortify.conf"
+grep -Fxq 'SORTIFY_CUSTOM_PARK_PREFIXES=heimnetz__' "$TMP/legacy-migration-state/sortify.conf"
+grep -Fxq 'SORTIFY_PREVIEW_MAX_FILES=50' "$TMP/legacy-migration-state/sortify.conf"
+grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$TMP/legacy-migration-state/sortify.conf"
+cmp -s "$TMP/legacy-migration-state/sortify.conf" "$TMP/legacy-migration-mirror/sortify.conf"
+ls "$TMP/legacy-migration-state/backups"/sortify.conf.pre-normalize.* >/dev/null
+
 cat > "$TMP/runtime/requests/apply.json" <<'JSON'
 {"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
@@ -87,6 +116,8 @@ echo 'adapter_json_contract=PASS'
 echo 'settings_apply_atomic=PASS'
 echo 'settings_backup=PASS'
 echo 'rollback_config_mirror=PASS'
+echo 'legacy_config_normalization=PASS'
+echo 'installer_webui_server_mode=PASS'
 echo 'reserved_prefix_reject=PASS'
 echo 'sdd_policy_v4115=PASS'
 echo 'preview_max_files_surface=PASS'
