@@ -1,0 +1,51 @@
+name: Telegram release announcement
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/telegram-release.yml'
+      - '.github/scripts/telegram_release_announcement.py'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to announce"
+        required: true
+      dry_run:
+        description: "Do not send Telegram message"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Verify announcement policy parser
+        env:
+          TELEGRAM_ANNOUNCEMENT_SELFTEST: "1"
+        run: python3 .github/scripts/telegram_release_announcement.py
+
+      - name: Send Telegram release post
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REPO: ${{ github.repository }}
+          RELEASE_ID: ${{ github.event.release.id }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          MANUAL_RELEASE_TAG: ${{ github.event.inputs.release_tag || '' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: python3 .github/scripts/telegram_release_announcement.py
