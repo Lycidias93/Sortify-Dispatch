@@ -1,0 +1,7 @@
+tag=v4.8.0-vnext-core061-r1
+target=6ecbb97c6a94f15188681e5f59491825470081c4
+asset=Sortify-Dispatch-4.8.0-vnext-core061-r1.zip
+asset_sha256=becea3a888d6ceabb193cc3d099055f62c4884dedbb563a1aac59b9b0d3c0f67
+webui_core_tag=v0.6.1
+webui_core_commit=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb
+release_state=published_and_redownload_verified
