@@ -5,6 +5,7 @@ PERSISTENT_CONFIG=$STATE_DIR/sortify.conf
 LEGACY_CONFIG=/data/adb/modules/sortify/sortify.conf
 DEFAULT_CONFIG=$MODPATH/config/sortify.conf.default
 LEGACY_MIRROR=$MODPATH/sortify.conf
+CONTROL_BASE=$MODPATH/bin/module-control-base
 
 ui_print "- Preparing persistent Sortify state..."
 mkdir -p "$STATE_DIR" "$STATE_DIR/backups" || abort "Failed to create Sortify state directory"
@@ -23,6 +24,14 @@ if [ ! -f "$PERSISTENT_CONFIG" ]; then
 fi
 chmod 0600 "$PERSISTENT_CONFIG" 2>/dev/null || true
 
+# Normalize legacy/stable configs immediately during install so the persistent
+# state is complete before first WebUI/action use. module-control-base preserves
+# known legacy values, fills vNext defaults and writes a rollback backup when it
+# changes the file.
+[ -f "$CONTROL_BASE" ] || abort "Sortify config normalizer is missing"
+MODULE_STATE_DIR="$STATE_DIR" SORTIFY_CONFIG_FILE="$PERSISTENT_CONFIG" \
+  sh "$CONTROL_BASE" config-get >/dev/null 2>&1 || abort "Failed to normalize persistent Sortify config"
+
 cp -f "$PERSISTENT_CONFIG" "$LEGACY_MIRROR" || abort "Failed to create rollback-compatible Sortify config mirror"
 chmod 0600 "$LEGACY_MIRROR" 2>/dev/null || true
 
@@ -33,6 +42,7 @@ set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/bin/module-control" 0 0 0755
 set_perm "$MODPATH/bin/module-control-base" 0 0 0755
 set_perm "$MODPATH/bin/sortify-domain" 0 0 0755
+set_perm "$MODPATH/bin/webui-server-arm64" 0 0 0755
 [ -f "$MODPATH/uninstall.sh" ] && set_perm "$MODPATH/uninstall.sh" 0 0 0755
 [ -f "$MODPATH/tools/sortify-download-cleanup.sh" ] && set_perm "$MODPATH/tools/sortify-download-cleanup.sh" 0 0 0755
 [ -f "$MODPATH/config/sortify.conf.default" ] && set_perm "$MODPATH/config/sortify.conf.default" 0 0 0644
