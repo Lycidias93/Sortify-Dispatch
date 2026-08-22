@@ -46,9 +46,9 @@ jobs:
       - name: Upload installable candidate
         uses: actions/upload-artifact@v4
         with:
-          name: Sortify-Dispatch-4.8.0-vnext-core061
+          name: Sortify-Dispatch-4.8.0-vnext-core061-r1
           path: |
-            dist/Sortify-Dispatch-4.8.0-vnext-core061.zip
+            dist/Sortify-Dispatch-4.8.0-vnext-core061-r1.zip
             dist/build-manifest.json
           if-no-files-found: error
           retention-days: 14
