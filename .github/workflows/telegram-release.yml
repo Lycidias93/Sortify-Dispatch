@@ -1,6 +1,10 @@
 name: Telegram release announcement
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/telegram-release.yml'
+      - '.github/scripts/telegram_release_announcement.py'
   release:
     types: [published]
   workflow_dispatch:
@@ -30,6 +34,7 @@ jobs:
         run: python3 .github/scripts/telegram_release_announcement.py
 
       - name: Send Telegram release post
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
