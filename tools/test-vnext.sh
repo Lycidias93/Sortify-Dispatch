@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CORE="$ROOT/.webui-core"
-CORE_COMMIT=6fbd1b018a45fe5b1bebba7aeb9142423eab47fb
+CORE_COMMIT=2fa70a09587296051062f66464cb18da791d28c2
 CORE_VERSION=0.6.1
 MODE=${1:-all}
 
@@ -104,6 +104,15 @@ grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$TMP/state/sortify.conf"
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
 ls "$TMP/state/backups"/sortify.conf.* >/dev/null
 
+# A killed/timed-out previous base apply can leave the old empty config.lock
+# behind. A subsequent save must self-heal that stale lock while keeping the
+# wrapper-level apply guard bounded and serialized.
+mkdir "$TMP/runtime/config.lock"
+env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply.json" > "$TMP/stale-lock-applied.json"
+python3 -m json.tool "$TMP/stale-lock-applied.json" >/dev/null
+[[ ! -d "$TMP/runtime/config.lock" ]]
+[[ ! -d "$TMP/runtime/config-apply.guard" ]]
+
 cat > "$TMP/runtime/requests/reject.json" <<'JSON'
 {"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"target-pi3__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
@@ -117,6 +126,7 @@ echo 'settings_apply_atomic=PASS'
 echo 'settings_backup=PASS'
 echo 'rollback_config_mirror=PASS'
 echo 'legacy_config_normalization=PASS'
+echo 'stale_config_lock_recovery=PASS'
 echo 'installer_webui_server_mode=PASS'
 echo 'reserved_prefix_reject=PASS'
 echo 'sdd_policy_v4115=PASS'
