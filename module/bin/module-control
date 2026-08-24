@@ -10,25 +10,59 @@ RUNTIME_DIR=${WEBUI_RUNTIME_DIR:-/data/local/tmp/sortify-webui}
 CONFIG_FILE=${SORTIFY_CONFIG_FILE:-$STATE_DIR/sortify.conf}
 LEGACY_MIRROR=${SORTIFY_LEGACY_MIRROR:-$MODDIR/sortify.conf}
 CONFIG_LOCK="$RUNTIME_DIR/config.lock"
+APPLY_GUARD="$RUNTIME_DIR/config-apply.guard"
+GUARD_OWNED=0
 
 [ -x "$BASE" ] || { echo '{"ok":false,"error":"Sortify module-control base unavailable"}' >&2; exit 69; }
 
-recover_stale_config_lock() {
-  [ -d "$CONFIG_LOCK" ] || return 0
+release_apply_guard() {
+  [ "$GUARD_OWNED" = 1 ] || return 0
+  rm -f "$APPLY_GUARD/pid" 2>/dev/null || true
+  rmdir "$APPLY_GUARD" 2>/dev/null || true
+  GUARD_OWNED=0
+}
+
+acquire_apply_guard() {
   attempts=0
-  while [ -d "$CONFIG_LOCK" ] && [ "$attempts" -lt 20 ]; do
+  while ! mkdir "$APPLY_GUARD" 2>/dev/null; do
+    owner=$(cat "$APPLY_GUARD/pid" 2>/dev/null || true)
+    case "$owner" in
+      ""|*[!0-9]*) ;;
+      *)
+        if ! kill -0 "$owner" 2>/dev/null; then
+          rm -f "$APPLY_GUARD/pid" 2>/dev/null || return 1
+          rmdir "$APPLY_GUARD" 2>/dev/null || return 1
+          continue
+        fi
+        ;;
+    esac
     attempts=$((attempts + 1))
+    if [ "$attempts" -ge 20 ]; then
+      [ -z "$owner" ] || return 1
+      rmdir "$APPLY_GUARD" 2>/dev/null || return 1
+      continue
+    fi
     sleep 0.1
   done
-  [ -d "$CONFIG_LOCK" ] || return 0
-  rmdir "$CONFIG_LOCK" 2>/dev/null
+  printf '%s\n' "$$" > "$APPLY_GUARD/pid" 2>/dev/null || {
+    rmdir "$APPLY_GUARD" 2>/dev/null || true
+    return 1
+  }
+  GUARD_OWNED=1
 }
 
 if [ "${1:-}" = "config-apply" ]; then
-  recover_stale_config_lock || {
-    echo '{"ok":false,"error":"Sortify config lock is still active"}' >&2
+  acquire_apply_guard || {
+    echo '{"ok":false,"error":"Sortify config apply is already active"}' >&2
     exit 75
   }
+  trap 'release_apply_guard' EXIT INT TERM HUP
+  if [ -d "$CONFIG_LOCK" ]; then
+    rmdir "$CONFIG_LOCK" 2>/dev/null || {
+      echo '{"ok":false,"error":"Sortify config lock is still active"}' >&2
+      exit 75
+    }
+  fi
 fi
 
 sh "$BASE" "$@"
@@ -42,6 +76,11 @@ if [ -f "$CONFIG_FILE" ]; then
       mv -f "$tmp" "$LEGACY_MIRROR" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
     fi
   fi
+fi
+
+if [ "$GUARD_OWNED" = 1 ]; then
+  trap - EXIT INT TERM HUP
+  release_apply_guard
 fi
 
 exit "$rc"
