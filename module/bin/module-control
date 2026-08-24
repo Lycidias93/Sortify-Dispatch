@@ -6,10 +6,30 @@ BINDIR=${0%/*}
 MODDIR=${MODULE_DIR:-${BINDIR%/bin}}
 BASE="$BINDIR/module-control-base"
 STATE_DIR=${MODULE_STATE_DIR:-/data/adb/sortify}
+RUNTIME_DIR=${WEBUI_RUNTIME_DIR:-/data/local/tmp/sortify-webui}
 CONFIG_FILE=${SORTIFY_CONFIG_FILE:-$STATE_DIR/sortify.conf}
 LEGACY_MIRROR=${SORTIFY_LEGACY_MIRROR:-$MODDIR/sortify.conf}
+CONFIG_LOCK="$RUNTIME_DIR/config.lock"
 
 [ -x "$BASE" ] || { echo '{"ok":false,"error":"Sortify module-control base unavailable"}' >&2; exit 69; }
+
+recover_stale_config_lock() {
+  [ -d "$CONFIG_LOCK" ] || return 0
+  attempts=0
+  while [ -d "$CONFIG_LOCK" ] && [ "$attempts" -lt 20 ]; do
+    attempts=$((attempts + 1))
+    sleep 0.1
+  done
+  [ -d "$CONFIG_LOCK" ] || return 0
+  rmdir "$CONFIG_LOCK" 2>/dev/null
+}
+
+if [ "${1:-}" = "config-apply" ]; then
+  recover_stale_config_lock || {
+    echo '{"ok":false,"error":"Sortify config lock is still active"}' >&2
+    exit 75
+  }
+fi
 
 sh "$BASE" "$@"
 rc=$?
