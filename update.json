@@ -1,6 +1,6 @@
 {
-  "version": "4.8.0-vnext-core061-r1",
-  "versionCode": 27,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.0-vnext-core061-r1/Sortify-Dispatch-4.8.0-vnext-core061-r1.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.0-vnext-core061-r1.md"
+  "version": "4.8.1-webui-settings-hotfix",
+  "versionCode": 28,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.1-webui-settings-hotfix/Sortify-Dispatch-4.8.1-webui-settings-hotfix.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.1-webui-settings-hotfix.md"
 }
