@@ -46,9 +46,9 @@ jobs:
       - name: Upload installable candidate
         uses: actions/upload-artifact@v4
         with:
-          name: Sortify-Dispatch-4.8.1-webui-settings-hotfix
+          name: Sortify-Dispatch-4.8.2-webui-functional-hotfix
           path: |
-            dist/Sortify-Dispatch-4.8.1-webui-settings-hotfix.zip
+            dist/Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip
             dist/build-manifest.json
           if-no-files-found: error
           retention-days: 14
