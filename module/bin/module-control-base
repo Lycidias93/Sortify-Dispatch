@@ -128,7 +128,9 @@ request_file_allowed() {
   [ "$size" -ge 1 ] && [ "$size" -le 65536 ]
 }
 
-json_bool() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$2" | head -n 1; }
+# Keep request parsing within portable POSIX BRE. Toybox sed does not guarantee
+# GNU sed's \| alternation extension; extraction and validation are separate.
+json_bool() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\([a-z][a-z]*\).*/\1/p' "$2" | head -n 1; }
 json_uint() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$2" | head -n 1; }
 json_text() { sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\([^"\\]*\)".*/\1/p' "$2" | head -n 1; }
 
