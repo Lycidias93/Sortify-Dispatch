@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.8.1-webui-settings-hotfix
-versionCode=28
+version=4.8.2-webui-functional-hotfix
+versionCode=29
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch with shared WebUI Core 0.6.1, reliable typed settings/actions and persistent config; SDD policy v4115 remains unchanged.
+description=Sortify Dispatch with Toybox-safe WebUI Settings saves, fixed embedded-host assets, persistent config and SDD policy v4115.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
