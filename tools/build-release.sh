@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CORE="$ROOT/.webui-core"
-CORE_COMMIT=2fa70a09587296051062f66464cb18da791d28c2
+CORE_COMMIT=b08dba9da0b26f93808c5382445fa985997716ea
 CORE_VERSION=0.6.1
 MODULE_SRC="$ROOT/module"
 DIST="$ROOT/dist"
@@ -15,6 +15,7 @@ fi
 [[ "$(tr -d '\r\n' < "$CORE/CORE_VERSION")" == "$CORE_VERSION" ]] || { echo "webui_core_version_mismatch"; exit 1; }
 
 bash "$ROOT/tools/test-vnext.sh" --source-only
+python3 "$CORE/scripts/webui-release-audit.py"
 
 VERSION=$(sed -n 's/^version=//p' "$MODULE_SRC/module.prop" | head -n1)
 [[ -n "$VERSION" ]] || { echo "module_version_missing"; exit 1; }
@@ -70,4 +71,5 @@ python3 "$ROOT/tools/package-vnext.py" \
   --core-commit "$CORE_COMMIT"
 
 echo "webui_core_provenance=PASS"
+echo "webui_release_audit=PASS"
 echo "RESULT: SORTIFY_VNEXT_BUILD_DONE outcome=success workflow_exit_code=0"
