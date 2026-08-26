@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CORE="$ROOT/.webui-core"
-CORE_COMMIT=2fa70a09587296051062f66464cb18da791d28c2
+CORE_COMMIT=b08dba9da0b26f93808c5382445fa985997716ea
 CORE_VERSION=0.6.1
 MODE=${1:-all}
 
@@ -30,6 +30,16 @@ sh -n "$ROOT/module/customize.sh"
 sh -n "$ROOT/module/uninstall.sh"
 python3 -m py_compile "$ROOT/tools/package-vnext.py"
 
+# Android/Toybox compatibility: request parsing must use portable POSIX BRE and
+# must not rely on GNU sed's \| alternation extension.
+json_bool_line=$(grep -F 'json_bool()' "$ROOT/module/bin/module-control-base")
+grep -Fq '\([a-z][a-z]*\)' <<< "$json_bool_line"
+if grep -Fq '\|' <<< "$json_bool_line"; then
+  echo 'toybox_json_bool_portability=FAIL'
+  exit 1
+fi
+echo 'toybox_json_bool_portability=PASS'
+
 grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_PREVIEW_MAX_FILES=50' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/bin/module-control-base"
@@ -39,6 +49,7 @@ grep -Fq 'set_perm "$MODPATH/bin/webui-server-arm64" 0 0 0755' "$ROOT/module/cus
 if [[ -d "$CORE/.git" || -f "$CORE/.git" ]]; then
   [[ "$(git -C "$CORE" rev-parse HEAD)" == "$CORE_COMMIT" ]]
   [[ "$(tr -d '\r\n' < "$CORE/CORE_VERSION")" == "$CORE_VERSION" ]]
+  python3 "$CORE/scripts/webui-release-audit.py"
 fi
 
 TMP=$(mktemp -d)
@@ -104,6 +115,19 @@ grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$TMP/state/sortify.conf"
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
 ls "$TMP/state/backups"/sortify.conf.* >/dev/null
 
+# Exercise false as well as true so extraction remains separate from boolean
+# validation and writes the expected 0/1 persistent representation.
+cat > "$TMP/runtime/requests/apply-false.json" <<'JSON'
+{"interval":600,"guard_log":false,"normal_sort":false,"sort_mode":"manual","hold_protected":false,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":false,"preview_max_files":75}
+JSON
+env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply-false.json" > "$TMP/applied-false.json"
+python3 -m json.tool "$TMP/applied-false.json" >/dev/null
+grep -Fxq 'GUARD_LOG=0' "$TMP/state/sortify.conf"
+grep -Fxq 'SORTIFY_NORMAL_SORT=0' "$TMP/state/sortify.conf"
+grep -Fxq 'SORTIFY_HOLD_PROTECTED=0' "$TMP/state/sortify.conf"
+grep -Fxq 'SORTIFY_GUARD_TEMP_CLEAN_ON_SORT=0' "$TMP/state/sortify.conf"
+cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
+
 # A killed/timed-out previous base apply can leave the old empty config.lock
 # behind. A subsequent save must self-heal that stale lock while keeping the
 # wrapper-level apply guard bounded and serialized.
@@ -123,6 +147,7 @@ fi
 
 echo 'adapter_json_contract=PASS'
 echo 'settings_apply_atomic=PASS'
+echo 'settings_boolean_false_roundtrip=PASS'
 echo 'settings_backup=PASS'
 echo 'rollback_config_mirror=PASS'
 echo 'legacy_config_normalization=PASS'
