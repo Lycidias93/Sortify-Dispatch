@@ -3,7 +3,7 @@ name: Sortify vNext source verify
 on:
   pull_request:
     paths:
-      - '.github/workflows/vnext-source-verify.yml'
+      - '.github/workflows/**'
       - '.gitmodules'
       - '.webui-core'
       - 'webui.lock'
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: bash ./tools/test-vnext.sh --source-only
 
-      - name: Build deterministic candidate
+      - name: Build deterministic candidate with WebUI release gates
         shell: bash
         run: bash ./tools/build-release.sh
 
