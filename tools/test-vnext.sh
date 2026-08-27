@@ -30,6 +30,16 @@ sh -n "$ROOT/module/customize.sh"
 sh -n "$ROOT/module/uninstall.sh"
 python3 -m py_compile "$ROOT/tools/package-vnext.py"
 
+# Keep the next-release WebUI gates mechanically wired into both the packaging
+# entrypoint and the permanent PR verifier. A workflow-only release change must
+# still execute the same deterministic build, static route audit and real
+# loopback HTTP integration test before it can be accepted.
+grep -Fq 'python3 "$CORE/scripts/webui-release-audit.py"' "$ROOT/tools/build-release.sh"
+grep -Fq 'bash "$CORE/scripts/integration-test.sh"' "$ROOT/tools/build-release.sh"
+grep -Fq -- "- '.github/workflows/**'" "$ROOT/.github/workflows/vnext-source-verify.yml"
+grep -Fq 'run: bash ./tools/build-release.sh' "$ROOT/.github/workflows/vnext-source-verify.yml"
+echo 'release_webui_audit_wiring=PASS'
+
 # Android/Toybox compatibility: request parsing must use portable POSIX BRE and
 # must not rely on GNU sed's \| alternation extension.
 json_bool_line=$(grep -F 'json_bool()' "$ROOT/module/bin/module-control-base")
