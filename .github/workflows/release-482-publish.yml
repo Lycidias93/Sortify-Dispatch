@@ -1,0 +1,114 @@
+name: Sortify 4.8.2 controlled stable publish
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-482-publish.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'Lycidias93/Sortify-Dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REPO: Lycidias93/Sortify-Dispatch
+      TARGET: 2b394896a2ac91bc8e7f19e559653a46a6f2630a
+      TAG: v4.8.2-webui-functional-hotfix
+      TITLE: Sortify Dispatch 4.8.2 – WebUI Functional Hotfix
+      VERSION: 4.8.2-webui-functional-hotfix
+      VERSION_CODE: '29'
+      ASSET_NAME: Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip
+      EXPECTED_SHA256: f71b020a6e6b44ac68ab2c6c894d0b55268be58534ab105bce32a499422034e0
+      EXPECTED_BYTES: '2497201'
+      NOTES: RELEASE_NOTES_v4.8.2-webui-functional-hotfix.md
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact accepted release target
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go from pinned WebUI Core
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: .webui-core/go.mod
+          cache: false
+
+      - name: Verify exact accepted candidate and release preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET"
+          test -s "$NOTES"
+          test "$(sed -n 's/^version=//p' module/module.prop | head -n1)" = "$VERSION"
+          test "$(sed -n 's/^versionCode=//p' module/module.prop | head -n1)" = "$VERSION_CODE"
+          bash tools/test-vnext.sh --source-only
+          python3 .webui-core/scripts/webui-release-audit.py
+          bash .webui-core/scripts/integration-test.sh
+          bash tools/build-release.sh
+          asset="dist/$ASSET_NAME"
+          test -f "$asset"
+          test "$(sha256sum "$asset" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(stat -c '%s' "$asset")" = "$EXPECTED_BYTES"
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo 'release_tag_collision=FAIL'
+            exit 1
+          fi
+          if gh api "repos/$REPO/releases/tags/$TAG" >/dev/null 2>&1; then
+            echo 'release_collision=FAIL'
+            exit 1
+          fi
+          echo 'release_preflight=PASS'
+
+      - name: Create draft, verify, publish and public-redownload verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          created=0
+          published=0
+          cleanup_on_error() {
+            rc=$?
+            if [ "$rc" -ne 0 ] && [ "$created" -eq 1 ] && [ "$published" -eq 0 ]; then
+              gh release delete "$TAG" --repo "$REPO" --yes --cleanup-tag >/dev/null 2>&1 || true
+            fi
+            exit "$rc"
+          }
+          trap cleanup_on_error EXIT
+
+          gh release create "$TAG" "dist/$ASSET_NAME" --repo "$REPO" --target "$TARGET" --title "$TITLE" --notes-file "$NOTES" --draft
+          created=1
+
+          release_id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.id')"
+          test -n "$release_id"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.draft')" = 'true'
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.prerelease')" = 'false'
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.name')" = "$TITLE"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.tag_name')" = "$TAG"
+          asset_size="$(gh api "repos/$REPO/releases/$release_id/assets" --jq '.[] | select(.name==env.ASSET_NAME) | .size')"
+          test "$asset_size" = "$EXPECTED_BYTES"
+          gh api --method PATCH "repos/$REPO/releases/$release_id" -f draft=false -f prerelease=false >/dev/null
+          published=1
+          trap - EXIT
+
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.draft')" = 'false'
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.prerelease')" = 'false'
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.name')" = "$TITLE"
+          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET"
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          gh release download "$TAG" --repo "$REPO" --pattern "$ASSET_NAME" --dir "$tmp"
+          test "$(sha256sum "$tmp/$ASSET_NAME" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(stat -c '%s' "$tmp/$ASSET_NAME")" = "$EXPECTED_BYTES"
+          gh api "repos/$REPO/releases/tags/$TAG" --jq '.body' > "$tmp/release-body.md"
+          cmp -s "$NOTES" "$tmp/release-body.md"
+          echo 'public_download_hash=PASS'
+          echo 'release_kind=stable'
+          echo 'RESULT: SORTIFY_482_RELEASE_PUBLISH_DONE outcome=success workflow_exit_code=0'
