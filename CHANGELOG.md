@@ -1,3 +1,10 @@
+<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_CHANGELOG_START -->
+## 4.8.2-webui-functional-hotfix - WebUI Functional Hotfix
+
+- Fixed WebUI Settings saves on Android/Toybox systems.
+- Fixed the embedded-host bootstrap JavaScript route in the authenticated loopback WebUI server.
+- Preserved existing Sortify settings and persistent configuration across the update.
+<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_CHANGELOG_END -->
 <!-- SORTIFY_DISPATCH_V480_CORE061_START -->
 ## 4.8.0 - Shared WebUI Core and persistent settings
 
