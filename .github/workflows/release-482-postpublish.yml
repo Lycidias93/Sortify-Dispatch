@@ -1,0 +1,160 @@
+name: Sortify 4.8.2 stable channel reconciliation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-482-postpublish.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-stable-channel:
+    if: github.repository == 'Lycidias93/Sortify-Dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      REPO: Lycidias93/Sortify-Dispatch
+      TARGET: 2b394896a2ac91bc8e7f19e559653a46a6f2630a
+      TAG: v4.8.2-webui-functional-hotfix
+      TITLE: Sortify Dispatch 4.8.2 – WebUI Functional Hotfix
+      VERSION: 4.8.2-webui-functional-hotfix
+      VERSION_CODE: '29'
+      ASSET_NAME: Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip
+      EXPECTED_SHA256: f71b020a6e6b44ac68ab2c6c894d0b55268be58534ab105bce32a499422034e0
+      EXPECTED_BYTES: '2497201'
+      NOTES: RELEASE_NOTES_v4.8.2-webui-functional-hotfix.md
+      WORK_BRANCH: repo-maintenance/4.8.2-stable-channel
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Reverify public stable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.id')"
+          test -n "$release_id"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.draft')" = 'false'
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.prerelease')" = 'false'
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.name')" = "$TITLE"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.target_commitish')" = "$TARGET"
+          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET"
+          asset_count="$(gh api "repos/$REPO/releases/$release_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .id" | wc -l | tr -d ' ')"
+          test "$asset_count" = '1'
+          asset_size="$(gh api "repos/$REPO/releases/$release_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .size")"
+          asset_digest="$(gh api "repos/$REPO/releases/$release_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .digest")"
+          test "$asset_size" = "$EXPECTED_BYTES"
+          test "$asset_digest" = "sha256:$EXPECTED_SHA256"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          gh release download "$TAG" --repo "$REPO" --pattern "$ASSET_NAME" --dir "$tmp"
+          test "$(sha256sum "$tmp/$ASSET_NAME" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(stat -c '%s' "$tmp/$ASSET_NAME")" = "$EXPECTED_BYTES"
+          release_body="$(gh api "repos/$REPO/releases/$release_id" --jq '.body')"
+          notes_body="$(cat "$NOTES")"
+          test "$release_body" = "$notes_body"
+          echo 'public_release_reverify=PASS'
+
+      - name: Prepare stable metadata and documentation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          version = '4.8.2-webui-functional-hotfix'
+          tag = 'v4.8.2-webui-functional-hotfix'
+          asset = 'Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip'
+          notes = 'RELEASE_NOTES_v4.8.2-webui-functional-hotfix.md'
+
+          update = Path('update.json')
+          data = json.loads(update.read_text(encoding='utf-8'))
+          data['version'] = version
+          data['versionCode'] = 29
+          data['zipUrl'] = f'https://github.com/Lycidias93/Sortify-Dispatch/releases/download/{tag}/{asset}'
+          data['changelog'] = f'https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/{notes}'
+          update.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+
+          readme = Path('README.md')
+          text = readme.read_text(encoding='utf-8')
+          old_start = '<!-- SORTIFY_DISPATCH_V481_WEBUI_SETTINGS_HOTFIX_README_START -->'
+          old_end = '<!-- SORTIFY_DISPATCH_V481_WEBUI_SETTINGS_HOTFIX_README_END -->'
+          if text.count(old_start) != 1 or text.count(old_end) != 1:
+              raise SystemExit('README current-release marker mismatch')
+          start = text.index(old_start)
+          end = text.index(old_end, start) + len(old_end)
+          current = '''<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_START -->
+          ## Sortify Dispatch 4.8.2
+
+          Current release: `4.8.2-webui-functional-hotfix`.
+
+          This hotfix restores WebUI Settings saves on Android/Toybox systems and fixes the authenticated embedded-host bootstrap asset route. Existing Sortify settings and persistent configuration are preserved during the update.
+
+          Sortify continues to use shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and SSH Drop Dispatcher policy `v4115`.
+
+          Install `Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
+          <!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_END -->'''
+          current = '\n'.join(line[10:] if line.startswith('          ') else line for line in current.splitlines())
+          text = text[:start] + current + text[end:]
+          old_version = '**Version:** 4.8.1-webui-settings-hotfix'
+          new_version = '**Version:** 4.8.2-webui-functional-hotfix'
+          if text.count(old_version) != 1:
+              raise SystemExit('README visible version mismatch')
+          text = text.replace(old_version, new_version, 1)
+          old_asset = 'Sortify-Dispatch-4.8.1-webui-settings-hotfix.zip'
+          if old_asset not in text:
+              raise SystemExit('README install filename mismatch')
+          text = text.replace(old_asset, asset)
+          readme.write_text(text, encoding='utf-8')
+
+          changelog = Path('CHANGELOG.md')
+          log = changelog.read_text(encoding='utf-8')
+          marker = '<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_CHANGELOG_START -->'
+          if marker in log:
+              raise SystemExit('4.8.2 changelog already present')
+          anchor = '<!-- SORTIFY_DISPATCH_V480_CORE061_START -->'
+          if log.count(anchor) != 1:
+              raise SystemExit('CHANGELOG insertion anchor mismatch')
+          entry = '''<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_CHANGELOG_START -->
+          ## 4.8.2-webui-functional-hotfix - WebUI Functional Hotfix
+
+          - Fixed WebUI Settings saves on Android/Toybox systems.
+          - Fixed the embedded-host bootstrap JavaScript route in the authenticated loopback WebUI server.
+          - Preserved existing Sortify settings and persistent configuration across the update.
+          <!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_CHANGELOG_END -->
+
+          '''
+          entry = '\n'.join(line[10:] if line.startswith('          ') else line for line in entry.splitlines())
+          log = log.replace(anchor, entry + anchor, 1)
+          changelog.write_text(log, encoding='utf-8')
+          PY
+
+          rm -f .github/workflows/release-482-publish.yml .github/workflows/release-482-postpublish.yml
+          python3 -m json.tool update.json >/dev/null
+          grep -Fxq '  "version": "4.8.2-webui-functional-hotfix",' update.json
+          grep -Fxq '  "versionCode": 29,' update.json
+          grep -Fq 'Current release: `4.8.2-webui-functional-hotfix`.' README.md
+          grep -Fq '**Version:** 4.8.2-webui-functional-hotfix' README.md
+          grep -Fq 'Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip' README.md
+          grep -Fq '## 4.8.2-webui-functional-hotfix - WebUI Functional Hotfix' CHANGELOG.md
+          test ! -e .github/workflows/release-482-publish.yml
+          test ! -e .github/workflows/release-482-postpublish.yml
+          git diff --check
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$WORK_BRANCH"
+          git add update.json README.md CHANGELOG.md .github/workflows/release-482-publish.yml .github/workflows/release-482-postpublish.yml
+          git commit -m 'Release metadata: advance stable channel to 4.8.2'
+          git push origin "$WORK_BRANCH"
+          echo "stable_channel_branch=$WORK_BRANCH"
+          echo 'README_checked=updated'
+          echo 'RESULT: SORTIFY_482_STABLE_CHANNEL_BRANCH_DONE outcome=success workflow_exit_code=0'
