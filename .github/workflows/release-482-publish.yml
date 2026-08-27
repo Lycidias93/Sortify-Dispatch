@@ -57,6 +57,25 @@ jobs:
           test -f "$asset"
           test "$(sha256sum "$asset" | awk '{print $1}')" = "$EXPECTED_SHA256"
           test "$(stat -c '%s' "$asset")" = "$EXPECTED_BYTES"
+
+          release_ids="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\") | .id")"
+          release_count="$(printf '%s\n' "$release_ids" | sed '/^$/d' | wc -l | tr -d ' ')"
+          test "$release_count" -le 1
+          if [ "$release_count" -eq 1 ]; then
+            stale_id="$(printf '%s\n' "$release_ids" | sed -n '1p')"
+            test "$(gh api "repos/$REPO/releases/$stale_id" --jq '.draft')" = 'true'
+            test "$(gh api "repos/$REPO/releases/$stale_id" --jq '.prerelease')" = 'false'
+            test "$(gh api "repos/$REPO/releases/$stale_id" --jq '.tag_name')" = "$TAG"
+            test "$(gh api "repos/$REPO/releases/$stale_id" --jq '.name')" = "$TITLE"
+            test "$(gh api "repos/$REPO/releases/$stale_id" --jq '.target_commitish')" = "$TARGET"
+            stale_asset_count="$(gh api "repos/$REPO/releases/$stale_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .id" | wc -l | tr -d ' ')"
+            test "$stale_asset_count" = '1'
+            stale_asset_size="$(gh api "repos/$REPO/releases/$stale_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .size")"
+            test "$stale_asset_size" = "$EXPECTED_BYTES"
+            gh api --method DELETE "repos/$REPO/releases/$stale_id"
+            echo 'stale_same_lane_draft_cleanup=PASS'
+          fi
+
           if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
             echo 'release_tag_collision=FAIL'
             exit 1
@@ -65,49 +84,69 @@ jobs:
             echo 'release_collision=FAIL'
             exit 1
           fi
+          remaining="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\") | .id" | wc -l | tr -d ' ')"
+          test "$remaining" = '0'
           echo 'release_preflight=PASS'
 
       - name: Create draft, verify, publish and public-redownload verify
         shell: bash
         run: |
           set -euo pipefail
-          created=0
+          draft_id=''
           published=0
           cleanup_on_error() {
             rc=$?
-            if [ "$rc" -ne 0 ] && [ "$created" -eq 1 ] && [ "$published" -eq 0 ]; then
-              gh release delete "$TAG" --repo "$REPO" --yes --cleanup-tag >/dev/null 2>&1 || true
+            if [ "$rc" -ne 0 ] && [ -n "$draft_id" ] && [ "$published" -eq 0 ]; then
+              gh api --method DELETE "repos/$REPO/releases/$draft_id" >/dev/null 2>&1 || true
+              if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+                ref_target="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null || true)"
+                if [ "$ref_target" = "$TARGET" ]; then
+                  gh api --method DELETE "repos/$REPO/git/refs/tags/$TAG" >/dev/null 2>&1 || true
+                fi
+              fi
             fi
             exit "$rc"
           }
           trap cleanup_on_error EXIT
 
           gh release create "$TAG" "dist/$ASSET_NAME" --repo "$REPO" --target "$TARGET" --title "$TITLE" --notes-file "$NOTES" --draft
-          created=1
-
-          release_id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.id')"
-          test -n "$release_id"
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.draft')" = 'true'
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.prerelease')" = 'false'
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.name')" = "$TITLE"
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.tag_name')" = "$TAG"
-          asset_size="$(gh api "repos/$REPO/releases/$release_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .size")"
+          draft_ids="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\" and .draft==true) | .id")"
+          draft_count="$(printf '%s\n' "$draft_ids" | sed '/^$/d' | wc -l | tr -d ' ')"
+          test "$draft_count" = '1'
+          draft_id="$(printf '%s\n' "$draft_ids" | sed -n '1p')"
+          test -n "$draft_id"
+          test "$(gh api "repos/$REPO/releases/$draft_id" --jq '.draft')" = 'true'
+          test "$(gh api "repos/$REPO/releases/$draft_id" --jq '.prerelease')" = 'false'
+          test "$(gh api "repos/$REPO/releases/$draft_id" --jq '.name')" = "$TITLE"
+          test "$(gh api "repos/$REPO/releases/$draft_id" --jq '.tag_name')" = "$TAG"
+          test "$(gh api "repos/$REPO/releases/$draft_id" --jq '.target_commitish')" = "$TARGET"
+          asset_count="$(gh api "repos/$REPO/releases/$draft_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .id" | wc -l | tr -d ' ')"
+          test "$asset_count" = '1'
+          asset_size="$(gh api "repos/$REPO/releases/$draft_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .size")"
           test "$asset_size" = "$EXPECTED_BYTES"
-          gh api --method PATCH "repos/$REPO/releases/$release_id" -f draft=false -f prerelease=false >/dev/null
+
+          gh api --method PATCH "repos/$REPO/releases/$draft_id" -F draft=false -F prerelease=false >/dev/null
           published=1
           trap - EXIT
 
-          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.draft')" = 'false'
-          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.prerelease')" = 'false'
-          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.name')" = "$TITLE"
+          public_id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.id')"
+          test "$public_id" = "$draft_id"
+          test "$(gh api "repos/$REPO/releases/$public_id" --jq '.draft')" = 'false'
+          test "$(gh api "repos/$REPO/releases/$public_id" --jq '.prerelease')" = 'false'
+          test "$(gh api "repos/$REPO/releases/$public_id" --jq '.name')" = "$TITLE"
+          test "$(gh api "repos/$REPO/releases/$public_id" --jq '.tag_name')" = "$TAG"
           test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET"
+          public_asset_count="$(gh api "repos/$REPO/releases/$public_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .id" | wc -l | tr -d ' ')"
+          test "$public_asset_count" = '1'
+          public_asset_size="$(gh api "repos/$REPO/releases/$public_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .size")"
+          test "$public_asset_size" = "$EXPECTED_BYTES"
 
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
           gh release download "$TAG" --repo "$REPO" --pattern "$ASSET_NAME" --dir "$tmp"
           test "$(sha256sum "$tmp/$ASSET_NAME" | awk '{print $1}')" = "$EXPECTED_SHA256"
           test "$(stat -c '%s' "$tmp/$ASSET_NAME")" = "$EXPECTED_BYTES"
-          release_body="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.body')"
+          release_body="$(gh api "repos/$REPO/releases/$public_id" --jq '.body')"
           notes_body="$(cat "$NOTES")"
           test "$release_body" = "$notes_body"
           echo 'public_download_hash=PASS'
