@@ -5,6 +5,8 @@ umask 077
 BINDIR=${0%/*}
 MODDIR=${MODULE_DIR:-${BINDIR%/bin}}
 BASE="$BINDIR/module-control-base"
+PROP="$MODDIR/module.prop"
+MODULE_VERSION=$(sed -n 's/^version=//p' "$PROP" 2>/dev/null | head -n 1)
 STATE_DIR=${MODULE_STATE_DIR:-/data/adb/sortify}
 RUNTIME_DIR=${WEBUI_RUNTIME_DIR:-/data/local/tmp/sortify-webui}
 CONFIG_FILE=${SORTIFY_CONFIG_FILE:-$STATE_DIR/sortify.conf}
@@ -51,6 +53,35 @@ acquire_apply_guard() {
   GUARD_OWNED=1
 }
 
+normalize_action_output() {
+  input=$1
+  version=${MODULE_VERSION:-unknown}
+  sed "s/version=4\.7\.1-webui-cleanup-hotfix/version=$version/g" "$input"
+}
+
+run_action_file_compat() {
+  mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+  out="$RUNTIME_DIR/module-control.action.$$"
+  err="$RUNTIME_DIR/module-control.action.err.$$"
+  rm -f "$out" "$err" 2>/dev/null || true
+
+  sh "$BASE" "$@" >"$out" 2>"$err"
+  rc=$?
+  normalize_action_output "$out"
+  cat "$err" >&2 2>/dev/null || true
+  rm -f "$out" "$err" 2>/dev/null || true
+
+  # Guard status is intentionally bounded. A timeout is a valid diagnostic
+  # result, not a broken module backend. Preserve the adapter's ok=false
+  # payload/message so the browser can present it as a warning, but return a
+  # successful transport exit so the HTTP layer does not collapse it into the
+  # generic "module backend failed" error.
+  if [ "${2:-}" = "guard-status" ] && [ "$rc" -eq 124 ]; then
+    return 0
+  fi
+  return "$rc"
+}
+
 if [ "${1:-}" = "config-apply" ]; then
   acquire_apply_guard || {
     echo '{"ok":false,"error":"Sortify config apply is already active"}' >&2
@@ -65,8 +96,13 @@ if [ "${1:-}" = "config-apply" ]; then
   fi
 fi
 
-sh "$BASE" "$@"
-rc=$?
+if [ "${1:-}" = "action-file" ]; then
+  run_action_file_compat "$@"
+  rc=$?
+else
+  sh "$BASE" "$@"
+  rc=$?
+fi
 
 if [ -f "$CONFIG_FILE" ]; then
   if ! cmp -s "$CONFIG_FILE" "$LEGACY_MIRROR" 2>/dev/null; then
