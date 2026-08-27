@@ -1,14 +1,14 @@
-<!-- SORTIFY_DISPATCH_V481_WEBUI_SETTINGS_HOTFIX_README_START -->
-## Sortify Dispatch 4.8.1
+<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_START -->
+## Sortify Dispatch 4.8.2
 
-Current release: `4.8.1-webui-settings-hotfix`.
+Current release: `4.8.2-webui-functional-hotfix`.
 
-This hotfix restores reliable Settings saves after interrupted or timed-out configuration applies by recovering stale local apply locks and serializing subsequent saves. It also fixes the mobile WebUI unsaved-changes bar so it no longer covers Settings and other action buttons on small screens.
+This hotfix restores WebUI Settings saves on Android/Toybox systems and fixes the authenticated embedded-host bootstrap asset route. Existing Sortify settings and persistent configuration are preserved during the update.
 
-Sortify continues to use shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and SSH Drop Dispatcher policy `v4115`. Existing Sortify settings and persistent configuration are preserved during the update.
+Sortify continues to use shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and SSH Drop Dispatcher policy `v4115`.
 
-Install `Sortify-Dispatch-4.8.1-webui-settings-hotfix.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
-<!-- SORTIFY_DISPATCH_V481_WEBUI_SETTINGS_HOTFIX_README_END -->
+Install `Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
+<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_END -->
 <!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_START -->
 ## Sortify Dispatch v4.7.1-webui-cleanup-hotfix
 
@@ -196,7 +196,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.8.1-webui-settings-hotfix
+**Version:** 4.8.2-webui-functional-hotfix
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -237,7 +237,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-4.8.1-webui-settings-hotfix.zip` from Releases.
+1. Download `Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.

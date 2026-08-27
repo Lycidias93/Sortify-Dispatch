@@ -1,6 +1,6 @@
 {
-  "version": "4.8.1-webui-settings-hotfix",
-  "versionCode": 28,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.1-webui-settings-hotfix/Sortify-Dispatch-4.8.1-webui-settings-hotfix.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.1-webui-settings-hotfix.md"
+  "version": "4.8.2-webui-functional-hotfix",
+  "versionCode": 29,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.2-webui-functional-hotfix/Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.2-webui-functional-hotfix.md"
 }
