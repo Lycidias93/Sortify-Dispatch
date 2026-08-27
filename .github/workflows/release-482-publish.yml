@@ -84,7 +84,12 @@ jobs:
             echo 'release_collision=FAIL'
             exit 1
           fi
-          remaining="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\") | .id" | wc -l | tr -d ' ')"
+          remaining=1
+          for _ in $(seq 1 20); do
+            remaining="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\") | .id" | wc -l | tr -d ' ')"
+            [ "$remaining" = '0' ] && break
+            sleep 0.5
+          done
           test "$remaining" = '0'
           echo 'release_preflight=PASS'
 
@@ -110,8 +115,15 @@ jobs:
           trap cleanup_on_error EXIT
 
           gh release create "$TAG" "dist/$ASSET_NAME" --repo "$REPO" --target "$TARGET" --title "$TITLE" --notes-file "$NOTES" --draft
-          draft_ids="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\" and .draft==true) | .id")"
-          draft_count="$(printf '%s\n' "$draft_ids" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+          draft_count=0
+          draft_ids=''
+          for _ in $(seq 1 20); do
+            draft_ids="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\") | select(.draft==true) | .id" || true)"
+            draft_count="$(printf '%s\n' "$draft_ids" | sed '/^$/d' | wc -l | tr -d ' ')"
+            [ "$draft_count" = '1' ] && break
+            sleep 0.5
+          done
           test "$draft_count" = '1'
           draft_id="$(printf '%s\n' "$draft_ids" | sed -n '1p')"
           test -n "$draft_id"
@@ -129,13 +141,26 @@ jobs:
           published=1
           trap - EXIT
 
-          public_id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.id')"
+          public_id=''
+          for _ in $(seq 1 20); do
+            public_id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.id' 2>/dev/null || true)"
+            [ -n "$public_id" ] && break
+            sleep 0.5
+          done
           test "$public_id" = "$draft_id"
           test "$(gh api "repos/$REPO/releases/$public_id" --jq '.draft')" = 'false'
           test "$(gh api "repos/$REPO/releases/$public_id" --jq '.prerelease')" = 'false'
           test "$(gh api "repos/$REPO/releases/$public_id" --jq '.name')" = "$TITLE"
           test "$(gh api "repos/$REPO/releases/$public_id" --jq '.tag_name')" = "$TAG"
-          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET"
+
+          ref_target=''
+          for _ in $(seq 1 20); do
+            ref_target="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null || true)"
+            [ -n "$ref_target" ] && break
+            sleep 0.5
+          done
+          test "$ref_target" = "$TARGET"
+
           public_asset_count="$(gh api "repos/$REPO/releases/$public_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .id" | wc -l | tr -d ' ')"
           test "$public_asset_count" = '1'
           public_asset_size="$(gh api "repos/$REPO/releases/$public_id/assets" --jq ".[] | select(.name==\"$ASSET_NAME\") | .size")"
