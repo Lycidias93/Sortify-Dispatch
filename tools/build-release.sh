@@ -16,6 +16,11 @@ fi
 
 bash "$ROOT/tools/test-vnext.sh" --source-only
 python3 "$CORE/scripts/webui-release-audit.py"
+# The reusable static release audit must be paired with the pinned Core's real
+# loopback HTTP integration test. This exercises bootstrap/session handling,
+# every shipped page-referenced asset, enabled API routes, config POST/readback,
+# actions/jobs/inventory, authentication and Origin rejection on every build.
+bash "$CORE/scripts/integration-test.sh"
 
 VERSION=$(sed -n 's/^version=//p' "$MODULE_SRC/module.prop" | head -n1)
 [[ -n "$VERSION" ]] || { echo "module_version_missing"; exit 1; }
@@ -72,4 +77,5 @@ python3 "$ROOT/tools/package-vnext.py" \
 
 echo "webui_core_provenance=PASS"
 echo "webui_release_audit=PASS"
+echo "webui_core_http_integration=PASS"
 echo "RESULT: SORTIFY_VNEXT_BUILD_DONE outcome=success workflow_exit_code=0"
