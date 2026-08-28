@@ -32,7 +32,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
           from pathlib import Path
 
           core_commit = "c5b47fb57e2b10d8b9f98448a7b692909ab956d8"
@@ -84,11 +83,11 @@ jobs:
           test.write_text(text.replace(tail_anchor, semantic, 1), encoding="utf-8")
 
           lock = Path("webui.lock")
-          data = json.loads(lock.read_text(encoding="utf-8"))
-          if data.get("template_commit") != "b08dba9da0b26f93808c5382445fa985997716ea":
+          text = lock.read_text(encoding="utf-8")
+          old_lock = "template_commit=b08dba9da0b26f93808c5382445fa985997716ea"
+          if text.count(old_lock) != 1:
               raise SystemExit("webui.lock core pin mismatch")
-          data["template_commit"] = core_commit
-          lock.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          lock.write_text(text.replace(old_lock, f"template_commit={core_commit}", 1), encoding="utf-8")
 
           readme = Path("README.md")
           text = readme.read_text(encoding="utf-8")
