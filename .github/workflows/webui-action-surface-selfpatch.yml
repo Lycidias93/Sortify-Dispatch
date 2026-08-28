@@ -1,0 +1,126 @@
+name: Sortify WebUI action surface self-patch
+
+on:
+  push:
+    branches:
+      - repo-maintenance/webui-action-surface-hardening-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.repository == 'Lycidias93/Sortify-Dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: repo-maintenance/webui-action-surface-hardening-20260828
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: .webui-core/go.mod
+          cache: false
+
+      - name: Apply exact source repair
+        shell: bash
+        env:
+          CORE_COMMIT: c5b47fb57e2b10d8b9f98448a7b692909ab956d8
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          core_commit = "c5b47fb57e2b10d8b9f98448a7b692909ab956d8"
+
+          domain = Path("module/bin/sortify-domain")
+          text = domain.read_text(encoding="utf-8")
+          text = text.replace(
+              "# Sortify Dispatch 4.7.1-webui-cleanup-hotfix - Manual Action / Guard Tools",
+              "# Sortify Dispatch - Manual Action / Guard Tools",
+              1,
+          )
+          anchor = 'CONF_PATH="${CONF_PATH:-$MODULE_DIR/sortify.conf}"\n'
+          insert = anchor + 'MODULE_VERSION="$(sed -n \'s/^version=//p\' "$MODULE_DIR/module.prop" 2>/dev/null | head -n 1)"\n[ -n "$MODULE_VERSION" ] || MODULE_VERSION=unknown\n'
+          if text.count(anchor) != 1:
+              raise SystemExit("domain version anchor mismatch")
+          text = text.replace(anchor, insert, 1)
+          text = text.replace("4.7.1-webui-cleanup-hotfix", "${MODULE_VERSION}")
+          if "4.7.1-webui-cleanup-hotfix" in text:
+              raise SystemExit("stale domain version remains")
+          domain.write_text(text, encoding="utf-8")
+
+          control = Path("module/bin/module-control-base")
+          text = control.read_text(encoding="utf-8")
+          old = '  printf \'{"ok":%s,"action":\' "$([ "$rc" -eq 0 ] && echo true || echo false)"; json_string "$name"; printf \',"message":\'; json_string "$output"; printf \'}\\n\'\n  return "$rc"\n}'
+          new = '  printf \'{"ok":%s,"action":\' "$([ "$rc" -eq 0 ] && echo true || echo false)"; json_string "$name"; printf \',"message":\'; json_string "$output"; printf \'}\\n\'\n  # The typed HTTP transport succeeded once semantic JSON was produced. Keep\n  # operation failure in ok=false so the browser can retain adapter details.\n  return 0\n}'
+          if text.count(old) != 1:
+              raise SystemExit("action_result transport anchor mismatch")
+          control.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          for name in ("tools/test-vnext.sh", "tools/build-release.sh"):
+              path = Path(name)
+              text = path.read_text(encoding="utf-8")
+              old_core = "b08dba9da0b26f93808c5382445fa985997716ea"
+              if text.count(old_core) != 1:
+                  raise SystemExit(f"{name} core pin mismatch")
+              path.write_text(text.replace(old_core, core_commit, 1), encoding="utf-8")
+
+          test = Path("tools/test-vnext.sh")
+          text = test.read_text(encoding="utf-8")
+          anchor = "echo 'toybox_json_bool_portability=PASS'\n"
+          addition = anchor + "\nif grep -Fq '4.7.1-webui-cleanup-hotfix' \"$ROOT/module/bin/sortify-domain\"; then\n  echo 'domain_runtime_version_binding=FAIL'\n  exit 1\nfi\ngrep -Fq 'MODULE_VERSION=\"$(sed -n '\"'\"'s/^version=//p'\"'\"' \"$MODULE_DIR/module.prop\" 2>/dev/null | head -n 1)\"' \"$ROOT/module/bin/sortify-domain\"\necho 'domain_runtime_version_binding=PASS'\n"
+          if text.count(anchor) != 1:
+              raise SystemExit("test insertion anchor mismatch")
+          text = text.replace(anchor, addition, 1)
+          tail_anchor = "echo 'reserved_prefix_reject=PASS'\n"
+          semantic = tail_anchor + "\ncat > \"$TMP/runtime/requests/action-failure.json\" <<'JSON'\n{\"dry_run\":false}\nJSON\ncat > \"$TMP/runtime/requests/apply-required-sdd.json\" <<'JSON'\n{\"interval\":600,\"guard_log\":true,\"normal_sort\":true,\"sort_mode\":\"manual\",\"hold_protected\":true,\"dispatcher_integration\":\"on\",\"duplicate_mode\":\"filename\",\"custom_park_prefixes\":\"\",\"guard_max_files\":450,\"guard_timeout\":10,\"log_max_kb\":2048,\"guard_temp_clean\":true,\"preview_max_files\":75}\nJSON\nenv \"${ENV[@]}\" sh \"$ROOT/module/bin/module-control\" config-apply \"$TMP/runtime/requests/apply-required-sdd.json\" >/dev/null\nenv \"${ENV[@]}\" sh \"$ROOT/module/bin/module-control\" action-file sort-now \"$TMP/runtime/requests/action-failure.json\" > \"$TMP/action-failure-result.json\"\npython3 - \"$TMP/action-failure-result.json\" <<'PY'\nimport json,sys\nvalue=json.load(open(sys.argv[1]))\nassert value['ok'] is False\nassert value['action']=='sort-now'\nassert 'dispatcher integration required' in value['message'].lower()\nPY\necho 'action_semantic_failure_transport=PASS'\n"
+          if text.count(tail_anchor) != 1:
+              raise SystemExit("semantic action test anchor mismatch")
+          test.write_text(text.replace(tail_anchor, semantic, 1), encoding="utf-8")
+
+          lock = Path("webui.lock")
+          data = json.loads(lock.read_text(encoding="utf-8"))
+          if data.get("template_commit") != "b08dba9da0b26f93808c5382445fa985997716ea":
+              raise SystemExit("webui.lock core pin mismatch")
+          data["template_commit"] = core_commit
+          lock.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+          readme = Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          marker = "<!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_START -->"
+          if marker not in text:
+              end = "<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_END -->"
+              if text.count(end) != 1:
+                  raise SystemExit("README 4.8.2 marker mismatch")
+              note = '''\n\n<!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_START -->\n### Current main: WebUI action-surface hardening\n\nCurrent source includes an unreleased follow-up to 4.8.2: long action output stays in a bounded Actions result panel instead of pushing the mobile UI out of view, safe read-only controls say **Run check**, semantic action failures keep the adapter detail visible, and action/status output derives the installed module version instead of showing a stale 4.7.1 label.\n\nThe public stable release remains `4.8.2-webui-functional-hotfix` until a separate release lane is authorized and completed.\n<!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_END -->'''
+              text = text.replace(end, end + note, 1)
+              readme.write_text(text, encoding="utf-8")
+          PY
+
+          git -C .webui-core fetch origin "$CORE_COMMIT"
+          git -C .webui-core checkout --detach "$CORE_COMMIT"
+
+          rm -f .github/workflows/webui-action-surface-selfpatch.yml
+
+          sh -n module/bin/module-control-base
+          sh -n module/bin/sortify-domain
+          bash tools/test-vnext.sh --source-only
+          bash tools/build-release.sh
+          git diff --check
+          grep -Fq 'Latest action result' .webui-core/module/webroot/observability.js
+          grep -Fq 'button.textContent !== "Run check"' .webui-core/module/webroot/observability.js
+          ! grep -Fq '4.7.1-webui-cleanup-hotfix' module/bin/sortify-domain
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix Sortify WebUI action surface and runtime version output'
+          git push origin HEAD:repo-maintenance/webui-action-surface-hardening-20260828
+
+          echo 'README_checked=updated'
+          echo 'RESULT: SORTIFY_WEBUI_ACTION_SURFACE_SOURCE_REPAIR_DONE outcome=success workflow_exit_code=0'
