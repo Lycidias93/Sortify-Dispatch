@@ -35,6 +35,10 @@ jobs:
         shell: bash
         run: bash ./tools/test-vnext.sh --source-only
 
+      - name: Verify WebUI action hotfix contracts
+        shell: bash
+        run: bash ./tools/test-webui-actions-hotfix.sh
+
       - name: Build deterministic candidate with WebUI release gates
         shell: bash
         run: bash ./tools/build-release.sh
@@ -46,9 +50,9 @@ jobs:
       - name: Upload installable candidate
         uses: actions/upload-artifact@v4
         with:
-          name: Sortify-Dispatch-4.8.2-webui-functional-hotfix
+          name: Sortify-Dispatch-4.8.3-webui-actions-hotfix
           path: |
-            dist/Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip
+            dist/Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip
             dist/build-manifest.json
           if-no-files-found: error
           retention-days: 14

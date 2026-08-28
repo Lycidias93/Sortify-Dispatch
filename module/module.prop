@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.8.2-webui-functional-hotfix
-versionCode=29
+version=4.8.3-webui-actions-hotfix
+versionCode=30
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch with Toybox-safe WebUI Settings saves, fixed embedded-host assets, persistent config and SDD policy v4115.
+description=Sortify Dispatch with bounded WebUI action results, semantic action error detail, current runtime version output, persistent config and SDD policy v4115.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
