@@ -257,7 +257,9 @@ action_result() {
   run_domain "$@" > "$tmp" 2>&1; rc=$?
   output=$(cat "$tmp" 2>/dev/null || true); rm -f "$tmp"
   printf '{"ok":%s,"action":' "$([ "$rc" -eq 0 ] && echo true || echo false)"; json_string "$name"; printf ',"message":'; json_string "$output"; printf '}\n'
-  return "$rc"
+  # The typed HTTP transport succeeded once semantic JSON was produced. Keep
+  # operation failure in ok=false so the browser can retain adapter details.
+  return 0
 }
 
 run_action_file() {
