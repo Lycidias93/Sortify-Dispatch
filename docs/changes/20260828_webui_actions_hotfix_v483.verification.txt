@@ -1,9 +1,0 @@
-source_branch=repo-maintenance/webui-action-surface-hardening-20260828
-base_main=bbd959da3222e4c7c391c4b27e2c4e879811d9f0
-shared_core_commit=c5b47fb57e2b10d8b9f98448a7b692909ab956d8
-shared_core_version=0.6.1
-candidate_version=4.8.3-webui-actions-hotfix
-candidate_version_code=30
-webui_release_audit_required=yes
-exact_device_acceptance_required=yes
-public_release_state=not_requested_in_this_change
