@@ -1,0 +1,3 @@
+status=ready_for_pull_request
+primary_branch=repo-maintenance/webui-action-surface-hardening-20260828
+superseded_branch=repo-maintenance/4.8.3-webui-actions-hotfix
