@@ -1,0 +1,14 @@
+path	impact
+.webui-core	pin shared WebUI Core action-feedback/mobile UX fix
+module/bin/module-control-base	preserve structured semantic action failure details
+module/bin/sortify-domain	derive current installed version for action/guard output
+module/module.prop	prepare 4.8.3 WebUI actions hotfix candidate
+tools/test-vnext.sh	assert semantic action transport and version binding
+tools/test-webui-actions-hotfix.sh	regress action feedback/version/guard-timeout behavior
+.github/workflows/vnext-source-verify.yml	run hotfix regression and upload 4.8.3 candidate
+tools/build-release.sh	build against exact updated shared Core pin
+webui.lock	record exact updated Core provenance
+README.md	document unreleased source hardening
+RELEASE_NOTES_v4.8.3-webui-actions-hotfix.md	document user-facing candidate changes
+docs/WEBUI_ACTIONS_HOTFIX_4.8.3.md	document source/verification split
+docs/changes/20260828_webui_actions_hotfix_v483.md	change record
