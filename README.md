@@ -13,7 +13,7 @@ Install `Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip` with a Magisk/Kerne
 <!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_START -->
 ### Current main: WebUI action-surface hardening
 
-Current source includes an unreleased follow-up to 4.8.2: long action output stays in a bounded Actions result panel instead of pushing the mobile UI out of view, safe read-only controls say **Run check**, semantic action failures keep the adapter detail visible, and action/status output derives the installed module version instead of showing a stale 4.7.1 label.
+Current source includes an unreleased follow-up to 4.8.2: long action output stays in a bounded Actions result panel instead of pushing the mobile UI out of view, safe read-only controls say **Run check**, semantic action failures keep the adapter detail visible, action/status output derives the installed module version instead of showing a stale 4.7.1 label, and focused WebUI form controls stay visible above the Android software keyboard.
 
 The public stable release remains `4.8.2-webui-functional-hotfix` until a separate release lane is authorized and completed.
 <!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_END -->
