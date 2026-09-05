@@ -1,3 +1,12 @@
+<!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_CHANGELOG_START -->
+## 4.8.3-webui-actions-hotfix - WebUI Actions Hotfix
+
+- Kept long action output inside a bounded result panel so the mobile WebUI stays usable.
+- Renamed safe read-only action controls to **Run check**.
+- Preserved detailed action failure messages instead of replacing them with a generic backend error.
+- Reported the installed Sortify version correctly in action and guard output.
+- Kept focused WebUI form controls visible above the Android software keyboard.
+<!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_CHANGELOG_END -->
 <!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_CHANGELOG_START -->
 ## 4.8.2-webui-functional-hotfix - WebUI Functional Hotfix
 
