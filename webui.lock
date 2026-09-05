@@ -1,6 +1,6 @@
 schema=sortify-dispatch-webui-core-lock-v1
 template_repository=Lycidias93/android-root-module-webui-template
-template_commit=e7aa23ebb36be9b9075c66693d045a19413af8b1
+template_commit=efd19b1e892a8ce9bd97490ef3ea9c2f2eeed7f7
 core_version=0.6.1
 core_manifest_sha256=94600c81b15571571e175f8a16e92177a77269541165f19886c86c0c332e1119
 consumption_model=pinned_gitlink_build_stage_sync
