@@ -23,9 +23,11 @@ Public stable remains `4.8.2-webui-functional-hotfix`.
 
 ## Sync
 
+The first sync attempt exposed a shared-Core release blocker: the new page referenced `mobile-input-viewport.js`, but the loopback server allowlist did not serve it. Shared Core PR #19 repaired that generic route and bound it into server, verify and loopback integration coverage.
+
 Sortify 4.8.3 is rebound to:
 
-- WebUI Core commit `e7aa23ebb36be9b9075c66693d045a19413af8b1`;
+- WebUI Core commit `efd19b1e892a8ce9bd97490ef3ea9c2f2eeed7f7`;
 - Core version `0.6.1`;
 - Core manifest SHA-256
   `94600c81b15571571e175f8a16e92177a77269541165f19886c86c0c332e1119`.
