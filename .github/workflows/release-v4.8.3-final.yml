@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   release:
-    if: startsWith(github.event.head_commit.message, 'Arm Sortify 4.8.3 verified release final path')
+    if: startsWith(github.event.head_commit.message, 'Arm Sortify 4.8.3 REST release final path')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -61,7 +61,7 @@ jobs:
           unzip -p "$ASSET_PATH" module.prop | grep -Fx "versionCode=$VERSION_CODE"
           git diff --exit-code
 
-      - name: Create verified tag, draft, publish, and public-download verify
+      - name: Create REST draft, upload, publish, and public-download verify
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -74,10 +74,6 @@ jobs:
             rc=$?
             if [ "$rc" -ne 0 ] && [ "$published" -eq 0 ]; then
               set +e
-              if [ -z "$release_id" ]; then
-                gh api "repos/$REPO/releases?per_page=100" > "$RUNNER_TEMP/releases-cleanup.json"
-                release_id="$(jq -r --arg tag "$TAG" --arg title "$RELEASE_TITLE" '[.[] | select(.tag_name == $tag and .name == $title and .draft == true)] | if length == 1 then .[0].id else empty end' "$RUNNER_TEMP/releases-cleanup.json")"
-              fi
               if [ -n "$release_id" ]; then
                 draft_state="$(gh api "repos/$REPO/releases/$release_id" --jq '.draft' 2>/dev/null)"
                 if [ "$draft_state" = "true" ]; then
@@ -103,42 +99,51 @@ jobs:
           gh api "repos/$REPO/releases?per_page=100" > "$RUNNER_TEMP/releases-before.json"
           test "$(jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length' "$RUNNER_TEMP/releases-before.json")" = "0"
 
-          gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$TARGET_COMMIT" >/dev/null
-          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.type')" = "commit"
+          gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$TARGET_COMMIT" > "$RUNNER_TEMP/tag-created.json"
+          test "$(jq -r '.object.type' "$RUNNER_TEMP/tag-created.json")" = "commit"
+          test "$(jq -r '.object.sha' "$RUNNER_TEMP/tag-created.json")" = "$TARGET_COMMIT"
           test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET_COMMIT"
 
-          gh release create "$TAG" "$ASSET_PATH" --repo "$REPO" --verify-tag --title "$RELEASE_TITLE" --notes-file "$RELEASE_NOTES_PATH" --draft
+          jq -n             --arg tag "$TAG"             --arg target "$TARGET_COMMIT"             --arg title "$RELEASE_TITLE"             --rawfile body "$RELEASE_NOTES_PATH"             '{tag_name:$tag,target_commitish:$target,name:$title,body:$body,draft:true,prerelease:false}'             > "$RUNNER_TEMP/create-release.json"
 
-          gh api "repos/$REPO/releases?per_page=100" > "$RUNNER_TEMP/releases-draft.json"
-          test "$(jq --arg tag "$TAG" --arg title "$RELEASE_TITLE" '[.[] | select(.tag_name == $tag and .name == $title and .draft == true and .prerelease == false)] | length' "$RUNNER_TEMP/releases-draft.json")" = "1"
-          release_id="$(jq -r --arg tag "$TAG" --arg title "$RELEASE_TITLE" '.[] | select(.tag_name == $tag and .name == $title and .draft == true) | .id' "$RUNNER_TEMP/releases-draft.json")"
+          gh api -X POST "repos/$REPO/releases" --input "$RUNNER_TEMP/create-release.json" > "$RUNNER_TEMP/release-created.json"
+          release_id="$(jq -r '.id' "$RUNNER_TEMP/release-created.json")"
           test -n "$release_id"
+          test "$release_id" != "null"
+          test "$(jq -r '.tag_name' "$RUNNER_TEMP/release-created.json")" = "$TAG"
+          test "$(jq -r '.name' "$RUNNER_TEMP/release-created.json")" = "$RELEASE_TITLE"
+          test "$(jq -r '.draft' "$RUNNER_TEMP/release-created.json")" = "true"
+          test "$(jq -r '.prerelease' "$RUNNER_TEMP/release-created.json")" = "false"
 
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.tag_name')" = "$TAG"
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.name')" = "$RELEASE_TITLE"
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.draft')" = "true"
-          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.prerelease')" = "false"
           gh api "repos/$REPO/releases/$release_id" --jq '.body' > "$RUNNER_TEMP/release-body.txt"
           cmp -s "$RELEASE_NOTES_PATH" "$RUNNER_TEMP/release-body.txt"
 
-          gh api "repos/$REPO/releases/$release_id/assets" > "$RUNNER_TEMP/assets.json"
-          test "$(jq --arg name "$ASSET_NAME" --argjson size "$ASSET_BYTES" '[.[] | select(.name == $name and .size == $size and .state == "uploaded")] | length' "$RUNNER_TEMP/assets.json")" = "1"
-          asset_digest="$(jq -r --arg name "$ASSET_NAME" '.[] | select(.name == $name) | .digest // empty' "$RUNNER_TEMP/assets.json")"
+          curl --fail-with-body --silent --show-error -L             -X POST             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2026-03-10"             -H "Content-Type: application/zip"             --data-binary "@$ASSET_PATH"             "https://uploads.github.com/repos/$REPO/releases/$release_id/assets?name=$ASSET_NAME"             > "$RUNNER_TEMP/asset-created.json"
+
+          test "$(jq -r '.name' "$RUNNER_TEMP/asset-created.json")" = "$ASSET_NAME"
+          test "$(jq -r '.state' "$RUNNER_TEMP/asset-created.json")" = "uploaded"
+          test "$(jq -r '.size' "$RUNNER_TEMP/asset-created.json")" = "$ASSET_BYTES"
+          asset_digest="$(jq -r '.digest // empty' "$RUNNER_TEMP/asset-created.json")"
           if [ -n "$asset_digest" ]; then
             test "$asset_digest" = "sha256:$ASSET_SHA256"
           fi
 
-          gh api -X PATCH "repos/$REPO/releases/$release_id" -F draft=false -F prerelease=false >/dev/null
+          gh api "repos/$REPO/releases/$release_id/assets" > "$RUNNER_TEMP/assets.json"
+          test "$(jq --arg name "$ASSET_NAME" --argjson size "$ASSET_BYTES" '[.[] | select(.name == $name and .size == $size and .state == "uploaded")] | length' "$RUNNER_TEMP/assets.json")" = "1"
+
+          gh api -X PATCH "repos/$REPO/releases/$release_id" -F draft=false -F prerelease=false > "$RUNNER_TEMP/release-published.json"
           published=1
 
+          test "$(jq -r '.draft' "$RUNNER_TEMP/release-published.json")" = "false"
+          test "$(jq -r '.prerelease' "$RUNNER_TEMP/release-published.json")" = "false"
+          test "$(jq -r '.tag_name' "$RUNNER_TEMP/release-published.json")" = "$TAG"
+          test "$(jq -r '.name' "$RUNNER_TEMP/release-published.json")" = "$RELEASE_TITLE"
           test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.draft')" = "false"
           test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.prerelease')" = "false"
-          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.tag_name')" = "$TAG"
-          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.name')" = "$RELEASE_TITLE"
           test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET_COMMIT"
 
           mkdir -p "$RUNNER_TEMP/public-release"
-          env -u GH_TOKEN -u GITHUB_TOKEN curl -fL --retry 3 --retry-delay 2 --retry-all-errors -o "$RUNNER_TEMP/public-release/$ASSET_NAME" "https://github.com/$REPO/releases/download/$TAG/$ASSET_NAME"
+          env -u GH_TOKEN -u GITHUB_TOKEN curl -fL --retry 3 --retry-delay 2 --retry-all-errors             -o "$RUNNER_TEMP/public-release/$ASSET_NAME"             "https://github.com/$REPO/releases/download/$TAG/$ASSET_NAME"
           test "$(stat -c '%s' "$RUNNER_TEMP/public-release/$ASSET_NAME")" = "$ASSET_BYTES"
           printf '%s  %s\n' "$ASSET_SHA256" "$RUNNER_TEMP/public-release/$ASSET_NAME" | sha256sum -c -
 
