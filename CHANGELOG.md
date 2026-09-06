@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_CHANGELOG_START -->
+## 4.8.4-webui-action-launch-hotfix - WebUI Action Launch Hotfix candidate
+
+- Fixed the module-manager Action-button race that could leave the external browser with `ERR_CONNECTION_REFUSED` on the one-time loopback bootstrap URL.
+- Pinned shared WebUI Core 0.6.2 and made the standalone server independent from launcher-shell stdin/SIGHUP teardown.
+- Kept the server explicitly user-triggered, loopback-only, authenticated by the existing one-time bootstrap flow, and bounded by the existing idle/session limits.
+- Preserved Sortify configuration and SSH Drop Dispatcher policy v4115.
+- Stable update metadata remains on 4.8.3 until exact-device Action-button acceptance is complete.
+<!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_CHANGELOG_END -->
+
 <!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_CHANGELOG_START -->
 ## 4.8.3-webui-actions-hotfix - WebUI Actions Hotfix
 
