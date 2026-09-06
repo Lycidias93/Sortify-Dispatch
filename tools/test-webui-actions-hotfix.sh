@@ -55,6 +55,12 @@ assert 'guard_status=timeout' in payload.get('message', ''), payload
 PY
 echo 'guard_status_timeout_semantic_transport=PASS'
 
+[[ "$(tr -d '\r\n' < "$ROOT/.webui-core/CORE_VERSION")" == "0.6.2" ]]
+grep -Fq 'server_detach=hup_safe' "$ROOT/.webui-core/module/action.sh"
+grep -Fq 'nohup "$@" </dev/null >> "$LOG_FILE" 2>&1 &' "$ROOT/.webui-core/module/action.sh"
+grep -Fq "trap '' HUP" "$ROOT/.webui-core/module/action.sh"
+echo 'webui_action_launcher_detach_contract=PASS'
+
 grep -Fq 'operation failure in ok=false' "$ROOT/module/bin/module-control-base"
 grep -Fq 'Latest action result' "$ROOT/.webui-core/module/webroot/observability.js"
 grep -Fq 'button.textContent !== "Run check"' "$ROOT/.webui-core/module/webroot/observability.js"
