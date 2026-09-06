@@ -3,9 +3,14 @@
 
 Source candidate: `4.8.4-webui-action-launch-hotfix` / `versionCode=31`.
 
-This candidate fixes the module-manager Action-button launch race where the external browser could reach the one-time `127.0.0.1` bootstrap URL after the standalone WebUI server had already stopped. It pins shared WebUI Core 0.6.2, which detaches the loopback server from the launcher shell's stdin/SIGHUP lifetime while preserving loopback-only binding, one-time bootstrap authentication, idle/session bounds, and existing Sortify state.
+This candidate fixes two WebUI field failures from 4.8.3:
 
-Stable release remains `4.8.3-webui-actions-hotfix` until the exact installed candidate passes the device Action-button WebUI audit.
+- the module-manager Action-button launch race where the external browser could reach the one-time `127.0.0.1` bootstrap URL after the standalone WebUI server had already stopped;
+- productive **Sort now** running synchronously through the Action HTTP request, which can take minutes on a large Download tree and surface as a browser network error even while sorting continues.
+
+It pins shared WebUI Core 0.6.3. The launcher is detached from the Action shell's stdin/SIGHUP lifetime, while Sort now keeps its synchronous read-only Preview but starts productive sorting through the bounded background Jobs lifecycle. Loopback-only binding, one-time bootstrap authentication, idle/session/job bounds, existing Sortify state, and SDD policy v4115 are preserved.
+
+Stable release remains `4.8.3-webui-actions-hotfix` until the exact installed candidate passes both Action-button bootstrap and productive Sort-now device acceptance.
 <!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_README_END -->
 
 <!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_README_START -->
