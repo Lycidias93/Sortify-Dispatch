@@ -1,22 +1,14 @@
-<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_START -->
-## Sortify Dispatch 4.8.2
+<!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_README_START -->
+## Sortify Dispatch 4.8.3
 
-Current release: `4.8.2-webui-functional-hotfix`.
+Current release: `4.8.3-webui-actions-hotfix`.
 
-This hotfix restores WebUI Settings saves on Android/Toybox systems and fixes the authenticated embedded-host bootstrap asset route. Existing Sortify settings and persistent configuration are preserved during the update.
+This hotfix keeps long action output inside a bounded mobile result panel, labels safe read-only actions as **Run check**, preserves detailed action failure messages, reports the installed Sortify version correctly, and keeps focused WebUI form controls visible above the Android software keyboard.
 
-Sortify continues to use shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and SSH Drop Dispatcher policy `v4115`.
+Existing Sortify settings and persistent configuration are preserved during the update. Sortify continues to use shared WebUI Core 0.6.1, persistent settings under `/data/adb/sortify`, typed WebUI operations, and SSH Drop Dispatcher policy `v4115`.
 
-Install `Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
-<!-- SORTIFY_DISPATCH_V482_WEBUI_FUNCTIONAL_HOTFIX_README_END -->
-
-<!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_START -->
-### Current main: WebUI action-surface hardening
-
-Current source includes an unreleased follow-up to 4.8.2: long action output stays in a bounded Actions result panel instead of pushing the mobile UI out of view, safe read-only controls say **Run check**, semantic action failures keep the adapter detail visible, action/status output derives the installed module version instead of showing a stale 4.7.1 label, and focused WebUI form controls stay visible above the Android software keyboard.
-
-The public stable release remains `4.8.2-webui-functional-hotfix` until a separate release lane is authorized and completed.
-<!-- SORTIFY_DISPATCH_WEBUI_ACTION_SURFACE_HARDENING_END -->
+Install `Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
+<!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_README_END -->
 <!-- SORTIFY_DISPATCH_V471_WEBUI_CLEANUP_HOTFIX_START -->
 ## Sortify Dispatch v4.7.1-webui-cleanup-hotfix
 
@@ -204,7 +196,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.8.2-webui-functional-hotfix
+**Version:** 4.8.3-webui-actions-hotfix
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -245,7 +237,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-4.8.2-webui-functional-hotfix.zip` from Releases.
+1. Download `Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.
