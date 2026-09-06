@@ -1,0 +1,146 @@
+name: Sortify 4.8.3 verified release final
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-v4.8.3-final.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'Arm Sortify 4.8.3 verified release final path')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REPO: Lycidias93/Sortify-Dispatch
+      TARGET_COMMIT: da884406a82513a3ed004c609b171a333000cc8c
+      TAG: v4.8.3-webui-actions-hotfix
+      RELEASE_TITLE: Sortify Dispatch 4.8.3 – WebUI Actions Hotfix
+      RELEASE_NOTES_PATH: RELEASE_NOTES_v4.8.3-webui-actions-hotfix.md
+      RELEASE_NOTES_BLOB: 6a95d00f42e16bad9e5c8458f466aea82871c1df
+      VERSION: 4.8.3-webui-actions-hotfix
+      VERSION_CODE: '30'
+      ASSET_PATH: dist/Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip
+      ASSET_NAME: Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip
+      ASSET_SHA256: 1bbacf98c56e8b1e1b7ab25368aabd72ca2eac0ab0a858b2a54973c50b34fdd2
+      ASSET_BYTES: '2500038'
+
+    steps:
+      - name: Checkout exact release target
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_COMMIT }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go from pinned WebUI Core
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: .webui-core/go.mod
+          cache: false
+
+      - name: Verify exact source and build exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git rev-parse "HEAD:$RELEASE_NOTES_PATH")" = "$RELEASE_NOTES_BLOB"
+          grep -Fx "version=$VERSION" module/module.prop
+          grep -Fx "versionCode=$VERSION_CODE" module/module.prop
+          bash ./tools/test-vnext.sh --source-only
+          bash ./tools/test-webui-actions-hotfix.sh
+          bash ./tools/build-release.sh
+          test -f "$ASSET_PATH"
+          test "$(stat -c '%s' "$ASSET_PATH")" = "$ASSET_BYTES"
+          printf '%s  %s\n' "$ASSET_SHA256" "$ASSET_PATH" | sha256sum -c -
+          unzip -p "$ASSET_PATH" module.prop | grep -Fx "version=$VERSION"
+          unzip -p "$ASSET_PATH" module.prop | grep -Fx "versionCode=$VERSION_CODE"
+          git diff --exit-code
+
+      - name: Create verified tag, draft, publish, and public-download verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          published=0
+          release_id=""
+
+          cleanup_pre_public() {
+            rc=$?
+            if [ "$rc" -ne 0 ] && [ "$published" -eq 0 ]; then
+              set +e
+              if [ -z "$release_id" ]; then
+                gh api "repos/$REPO/releases?per_page=100" > "$RUNNER_TEMP/releases-cleanup.json"
+                release_id="$(jq -r --arg tag "$TAG" --arg title "$RELEASE_TITLE" '[.[] | select(.tag_name == $tag and .name == $title and .draft == true)] | if length == 1 then .[0].id else empty end' "$RUNNER_TEMP/releases-cleanup.json")"
+              fi
+              if [ -n "$release_id" ]; then
+                draft_state="$(gh api "repos/$REPO/releases/$release_id" --jq '.draft' 2>/dev/null)"
+                if [ "$draft_state" = "true" ]; then
+                  gh api -X DELETE "repos/$REPO/releases/$release_id" >/dev/null
+                fi
+              fi
+              tag_type="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.type' 2>/dev/null)"
+              tag_sha="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null)"
+              if [ "$tag_type" = "commit" ] && [ "$tag_sha" = "$TARGET_COMMIT" ]; then
+                gh api -X DELETE "repos/$REPO/git/refs/tags/$TAG" >/dev/null
+              fi
+              set -e
+            fi
+            exit "$rc"
+          }
+          trap cleanup_pre_public EXIT
+
+          gh auth status >/dev/null 2>&1
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "STOP: tag already exists"
+            exit 1
+          fi
+          gh api "repos/$REPO/releases?per_page=100" > "$RUNNER_TEMP/releases-before.json"
+          test "$(jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length' "$RUNNER_TEMP/releases-before.json")" = "0"
+
+          gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$TARGET_COMMIT" >/dev/null
+          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.type')" = "commit"
+          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET_COMMIT"
+
+          gh release create "$TAG" "$ASSET_PATH" --repo "$REPO" --verify-tag --title "$RELEASE_TITLE" --notes-file "$RELEASE_NOTES_PATH" --draft
+
+          gh api "repos/$REPO/releases?per_page=100" > "$RUNNER_TEMP/releases-draft.json"
+          test "$(jq --arg tag "$TAG" --arg title "$RELEASE_TITLE" '[.[] | select(.tag_name == $tag and .name == $title and .draft == true and .prerelease == false)] | length' "$RUNNER_TEMP/releases-draft.json")" = "1"
+          release_id="$(jq -r --arg tag "$TAG" --arg title "$RELEASE_TITLE" '.[] | select(.tag_name == $tag and .name == $title and .draft == true) | .id' "$RUNNER_TEMP/releases-draft.json")"
+          test -n "$release_id"
+
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.tag_name')" = "$TAG"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.name')" = "$RELEASE_TITLE"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.draft')" = "true"
+          test "$(gh api "repos/$REPO/releases/$release_id" --jq '.prerelease')" = "false"
+          gh api "repos/$REPO/releases/$release_id" --jq '.body' > "$RUNNER_TEMP/release-body.txt"
+          cmp -s "$RELEASE_NOTES_PATH" "$RUNNER_TEMP/release-body.txt"
+
+          gh api "repos/$REPO/releases/$release_id/assets" > "$RUNNER_TEMP/assets.json"
+          test "$(jq --arg name "$ASSET_NAME" --argjson size "$ASSET_BYTES" '[.[] | select(.name == $name and .size == $size and .state == "uploaded")] | length' "$RUNNER_TEMP/assets.json")" = "1"
+          asset_digest="$(jq -r --arg name "$ASSET_NAME" '.[] | select(.name == $name) | .digest // empty' "$RUNNER_TEMP/assets.json")"
+          if [ -n "$asset_digest" ]; then
+            test "$asset_digest" = "sha256:$ASSET_SHA256"
+          fi
+
+          gh api -X PATCH "repos/$REPO/releases/$release_id" -F draft=false -F prerelease=false >/dev/null
+          published=1
+
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.draft')" = "false"
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.prerelease')" = "false"
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.tag_name')" = "$TAG"
+          test "$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.name')" = "$RELEASE_TITLE"
+          test "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')" = "$TARGET_COMMIT"
+
+          mkdir -p "$RUNNER_TEMP/public-release"
+          env -u GH_TOKEN -u GITHUB_TOKEN curl -fL --retry 3 --retry-delay 2 --retry-all-errors -o "$RUNNER_TEMP/public-release/$ASSET_NAME" "https://github.com/$REPO/releases/download/$TAG/$ASSET_NAME"
+          test "$(stat -c '%s' "$RUNNER_TEMP/public-release/$ASSET_NAME")" = "$ASSET_BYTES"
+          printf '%s  %s\n' "$ASSET_SHA256" "$RUNNER_TEMP/public-release/$ASSET_NAME" | sha256sum -c -
+
+          trap - EXIT
+          echo "RESULT: SORTIFY_V483_PUBLIC_RELEASE_DONE outcome=success release_kind=stable asset_sha256=$ASSET_SHA256 asset_bytes=$ASSET_BYTES"
