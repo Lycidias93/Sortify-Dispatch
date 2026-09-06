@@ -1,3 +1,13 @@
+<!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_README_START -->
+## Sortify Dispatch 4.8.4 candidate
+
+Source candidate: `4.8.4-webui-action-launch-hotfix` / `versionCode=31`.
+
+This candidate fixes the module-manager Action-button launch race where the external browser could reach the one-time `127.0.0.1` bootstrap URL after the standalone WebUI server had already stopped. It pins shared WebUI Core 0.6.2, which detaches the loopback server from the launcher shell's stdin/SIGHUP lifetime while preserving loopback-only binding, one-time bootstrap authentication, idle/session bounds, and existing Sortify state.
+
+Stable release remains `4.8.3-webui-actions-hotfix` until the exact installed candidate passes the device Action-button WebUI audit.
+<!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_README_END -->
+
 <!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_README_START -->
 ## Sortify Dispatch 4.8.3
 
