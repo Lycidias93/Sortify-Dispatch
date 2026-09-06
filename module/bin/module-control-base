@@ -182,7 +182,7 @@ print_capabilities() {
   printf '{"key":"guard_temp_clean","label":"Clean stale guard temp files","description":"Remove stale Sortify guard temp files before sorting.","type":"boolean","required":true},'
   printf '{"key":"preview_max_files","label":"Preview file limit","description":"Maximum files shown by Preview Sort.","type":"integer","required":true,"min":1,"max":200}'
   printf '],"actions":['
-  printf '{"name":"sort-now","label":"Sort now","description":"Run one normal Sortify pass. Preview uses the existing read-only route logic.","risk":"caution","supports_dry_run":true},'
+  printf '{"name":"sort-now","label":"Sort now","description":"Preview synchronously; productive sorting runs as a bounded background job.","risk":"caution","supports_dry_run":true,"apply_job":"sort-now"},'
   printf '{"name":"guard-status","label":"Guard status","description":"Bounded read-only protected-artifact audit.","risk":"safe"},'
   printf '{"name":"guard-clean","label":"Restore misplaced protected artifacts","description":"Move misplaced protected artifacts back to Download; collisions go to GuardConflicts.","risk":"caution"},'
   printf '{"name":"guard-temp-clean","label":"Clean guard temp files","description":"Remove stale Sortify-owned temp files only.","risk":"caution"},'
@@ -190,6 +190,7 @@ print_capabilities() {
   printf '{"name":"contract-smoke","label":"Contract smoke","description":"Run the read-only Sortify/SDD v4115 contract smoke.","risk":"safe"},'
   printf '{"name":"log-rotate","label":"Rotate logs","description":"Rotate bounded Sortify logs now.","risk":"safe"}'
   printf '],"jobs":['
+  printf '{"name":"sort-now","label":"Sort now","description":"Run one productive Sortify pass as a bounded background job.","risk":"caution"},'
   printf '{"name":"cleanup-scan","label":"Cleanup scan","description":"Read-only Download cleanup candidate scan.","risk":"safe"},'
   printf '{"name":"config-export","label":"Export Sortify config","description":"Create the existing Sortify-only configuration export in Download.","risk":"caution"}'
   printf '],"inventories":['
@@ -267,7 +268,7 @@ run_action_file() {
   dry_run=$(json_bool dry_run "$file"); [ -n "$dry_run" ] || dry_run=false
   case "$dry_run" in true|false) ;; *) return 2 ;; esac
   case "$name" in
-    sort-now) [ "$dry_run" = true ] && action_result "$name" --preview-sort || action_result "$name" --sort ;;
+    sort-now) [ "$dry_run" = true ] || return 2; action_result "$name" --preview-sort ;;
     guard-status) [ "$dry_run" = false ] || return 2; action_result "$name" --guard-status ;;
     guard-clean) [ "$dry_run" = false ] || return 2; action_result "$name" --guard-clean ;;
     guard-temp-clean) [ "$dry_run" = false ] || return 2; action_result "$name" --guard-temp-clean ;;
@@ -280,6 +281,7 @@ run_action_file() {
 
 run_job() {
   case "$1" in
+    sort-now) run_domain --sort ;;
     cleanup-scan) run_domain --cleanup-scan ;;
     config-export) run_domain --config-export ;;
     *) return 2 ;;
