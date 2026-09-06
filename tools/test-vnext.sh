@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CORE="$ROOT/.webui-core"
-CORE_COMMIT=efd19b1e892a8ce9bd97490ef3ea9c2f2eeed7f7
-CORE_VERSION=0.6.1
+CORE_COMMIT=6791a05be79f162979c76a286f7cdbdd9ce1cc6b
+CORE_VERSION=0.6.3
 MODE=${1:-all}
 
 required=(
@@ -179,15 +179,17 @@ cat > "$TMP/runtime/requests/apply-required-sdd.json" <<'JSON'
 {"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"dispatcher_integration":"on","duplicate_mode":"filename","custom_park_prefixes":"","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply-required-sdd.json" >/dev/null
-env "${ENV[@]}" sh "$ROOT/module/bin/module-control" action-file sort-now "$TMP/runtime/requests/action-failure.json" > "$TMP/action-failure-result.json"
-python3 - "$TMP/action-failure-result.json" <<'PY'
-import json,sys
-value=json.load(open(sys.argv[1]))
-assert value['ok'] is False
-assert value['action']=='sort-now'
-assert 'dispatcher integration required' in value['message'].lower()
-PY
-echo 'action_semantic_failure_transport=PASS'
+if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" action-file sort-now "$TMP/runtime/requests/action-failure.json" >/dev/null 2>&1; then
+  echo 'sort_now_direct_apply_reject=FAIL'
+  exit 1
+fi
+if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" job-run sort-now > "$TMP/sort-job-failure.out" 2>&1; then
+  echo 'sort_now_job_semantic_failure=FAIL'
+  exit 1
+fi
+grep -Fiq 'dispatcher integration required' "$TMP/sort-job-failure.out"
+echo 'sort_now_direct_apply_reject=PASS'
+echo 'sort_now_job_semantic_failure=PASS'
 echo 'sdd_policy_v4115=PASS'
 echo 'preview_max_files_surface=PASS'
 [[ "$MODE" == --source-only || "$MODE" == all ]] || { echo "invalid_mode=$MODE"; exit 2; }

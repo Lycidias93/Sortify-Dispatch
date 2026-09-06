@@ -55,6 +55,25 @@ assert 'guard_status=timeout' in payload.get('message', ''), payload
 PY
 echo 'guard_status_timeout_semantic_transport=PASS'
 
+[[ "$(tr -d '\r\n' < "$ROOT/.webui-core/CORE_VERSION")" == "0.6.3" ]]
+grep -Fq 'server_detach=hup_safe' "$ROOT/.webui-core/module/action.sh"
+grep -Fq 'nohup "$@" </dev/null >> "$LOG_FILE" 2>&1 &' "$ROOT/.webui-core/module/action.sh"
+grep -Fq "trap '' HUP" "$ROOT/.webui-core/module/action.sh"
+echo 'webui_action_launcher_detach_contract=PASS'
+
+grep -Fq '"apply_job":"sort-now"' "$ROOT/module/bin/module-control-base"
+grep -Fq '{"name":"sort-now","label":"Sort now","description":"Run one productive Sortify pass as a bounded background job.","risk":"caution"}' "$ROOT/module/bin/module-control-base"
+grep -Fq 'sort-now) [ "$dry_run" = true ] || return 2; action_result "$name" --preview-sort ;;' "$ROOT/module/bin/module-control-base"
+grep -Fq 'sort-now) run_domain --sort ;;' "$ROOT/module/bin/module-control-base"
+if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" action-file sort-now "$TMP/runtime/requests/guard.json" >/dev/null 2>&1; then
+  echo 'sort_now_sync_apply_reject=FAIL'
+  exit 1
+fi
+env "${ENV[@]}" sh "$ROOT/module/bin/module-control" job-run sort-now > "$TMP/sort-job.out"
+grep -Fq 'Manual sort completed' "$TMP/sort-job.out"
+echo 'sort_now_sync_apply_reject=PASS'
+echo 'sort_now_background_apply_contract=PASS'
+
 grep -Fq 'operation failure in ok=false' "$ROOT/module/bin/module-control-base"
 grep -Fq 'Latest action result' "$ROOT/.webui-core/module/webroot/observability.js"
 grep -Fq 'button.textContent !== "Run check"' "$ROOT/.webui-core/module/webroot/observability.js"
