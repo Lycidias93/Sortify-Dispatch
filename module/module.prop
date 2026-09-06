@@ -3,6 +3,6 @@ name=Sortify Dispatch
 version=4.8.4-webui-action-launch-hotfix
 versionCode=31
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch with reliable Action-button WebUI launch, bounded action results, persistent config and SDD policy v4115.
+description=Sortify Dispatch with reliable Action-button WebUI launch, background Sort now apply, persistent config and SDD policy v4115.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
