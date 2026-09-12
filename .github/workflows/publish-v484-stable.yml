@@ -72,3 +72,22 @@ jobs:
           printf '%s  %s\n' "$EXPECTED_SHA256" "$published" | sha256sum -c -
           gh release view "$TAG" --json tagName,isDraft,isPrerelease,targetCommitish,url
           printf '%s\n' 'RESULT: SORTIFY_V484_STABLE_RELEASE_PUBLISH_PASS'
+
+      - name: Promote public frontdoors after release verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/promote-v484-stable.py
+          git diff --check
+          grep -Fq '"version": "4.8.4-webui-action-launch-hotfix"' update.json
+          grep -Fq '## Sortify Dispatch 4.8.4' README.md
+          grep -Fq '## 4.8.4-webui-action-launch-hotfix - WebUI Action Launch Hotfix' CHANGELOG.md
+          grep -Fq '## What changed' RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md
+          if ! git diff --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add README.md CHANGELOG.md RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md update.json
+            git commit -m 'Promote Sortify 4.8.4 public frontdoors'
+            git push origin HEAD:main
+          fi
+          printf '%s\n' 'RESULT: SORTIFY_V484_PUBLIC_FRONTDOOR_PROMOTION_PASS'
