@@ -1,6 +1,6 @@
 {
-  "version": "4.8.3-webui-actions-hotfix",
-  "versionCode": 30,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.3-webui-actions-hotfix/Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.3-webui-actions-hotfix.md"
+  "version": "4.8.4-webui-action-launch-hotfix",
+  "versionCode": 31,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.4-webui-action-launch-hotfix/Sortify-Dispatch-4.8.4-webui-action-launch-hotfix.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md"
 }
