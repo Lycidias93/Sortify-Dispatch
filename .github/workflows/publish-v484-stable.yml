@@ -1,0 +1,93 @@
+name: Publish Sortify 4.8.4 stable
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v484-stable.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: v4.8.4-webui-action-launch-hotfix
+      ASSET: dist/Sortify-Dispatch-4.8.4-webui-action-launch-hotfix.zip
+      EXPECTED_SHA256: 6fd05118990e797d8868e6dd8279c220ddf881aad072872c9752fbc1387eecc1
+      EXPECTED_BYTES: '2502058'
+      TARGET_SHA: a3bce87db788b861709df656e349bb9dd0e61bd3
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build exact accepted package
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/build-release.sh
+          test -f "$ASSET"
+          test "$(stat -c %s "$ASSET")" = "$EXPECTED_BYTES"
+          printf '%s  %s\n' "$EXPECTED_SHA256" "$ASSET" | sha256sum -c -
+
+      - name: Publish or verify stable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/release-notes.md"
+          printf '%s\n' \
+            '## What changed' \
+            '' \
+            '- Fixes the module-manager Action button opening an unreachable local WebUI.' \
+            '- Fixes productive Sort now showing a network error on large Download trees. Productive sorting now runs as a background Job while Preview stays synchronous.' \
+            '- Existing Sortify settings and persistent configuration are preserved.' \
+            '' \
+            'Install or update the module with a Magisk/KernelSU-compatible module manager and reboot once.' \
+            > "$notes"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            dir="$RUNNER_TEMP/existing-release"
+            mkdir -p "$dir"
+            gh release download "$TAG" --pattern "$(basename "$ASSET")" --dir "$dir"
+            existing="$dir/$(basename "$ASSET")"
+            test "$(stat -c %s "$existing")" = "$EXPECTED_BYTES"
+            printf '%s  %s\n' "$EXPECTED_SHA256" "$existing" | sha256sum -c -
+            printf '%s\n' 'release_state=existing_verified'
+          else
+            gh release create "$TAG" "$ASSET" --target "$TARGET_SHA" --title 'Sortify Dispatch 4.8.4' --notes-file "$notes"
+            printf '%s\n' 'release_state=created'
+          fi
+
+      - name: Verify published release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/release-verify"
+          mkdir -p "$dir"
+          gh release download "$TAG" --pattern "$(basename "$ASSET")" --dir "$dir"
+          published="$dir/$(basename "$ASSET")"
+          test "$(stat -c %s "$published")" = "$EXPECTED_BYTES"
+          printf '%s  %s\n' "$EXPECTED_SHA256" "$published" | sha256sum -c -
+          gh release view "$TAG" --json tagName,isDraft,isPrerelease,targetCommitish,url
+          printf '%s\n' 'RESULT: SORTIFY_V484_STABLE_RELEASE_PUBLISH_PASS'
+
+      - name: Promote public frontdoors after release verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/promote-v484-stable.py
+          git diff --check
+          grep -Fq '"version": "4.8.4-webui-action-launch-hotfix"' update.json
+          grep -Fq '## Sortify Dispatch 4.8.4' README.md
+          grep -Fq '## 4.8.4-webui-action-launch-hotfix - WebUI Action Launch Hotfix' CHANGELOG.md
+          grep -Fq '## What changed' RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md
+          if ! git diff --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add README.md CHANGELOG.md RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md update.json
+            git commit -m 'Promote Sortify 4.8.4 public frontdoors'
+            git push origin HEAD:main
+          fi
+          printf '%s\n' 'RESULT: SORTIFY_V484_PUBLIC_FRONTDOOR_PROMOTION_PASS'
