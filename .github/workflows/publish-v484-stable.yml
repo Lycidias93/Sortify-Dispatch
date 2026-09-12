@@ -22,6 +22,7 @@ jobs:
       EXPECTED_SHA256: 6fd05118990e797d8868e6dd8279c220ddf881aad072872c9752fbc1387eecc1
       EXPECTED_BYTES: '2502058'
       TARGET_SHA: a3bce87db788b861709df656e349bb9dd0e61bd3
+      PROMOTION_BRANCH: automation/v484-public-frontdoors
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +83,7 @@ jobs:
           gh release view "$TAG" --json tagName,isDraft,isPrerelease,targetCommitish,url
           printf '%s\n' 'RESULT: SORTIFY_V484_STABLE_RELEASE_PUBLISH_PASS'
 
-      - name: Promote public frontdoors after release verification
+      - name: Prepare public frontdoor pull-request branch
         shell: bash
         run: |
           set -euo pipefail
@@ -92,11 +93,10 @@ jobs:
           grep -Fq '## Sortify Dispatch 4.8.4' README.md
           grep -Fq '## 4.8.4-webui-action-launch-hotfix - WebUI Action Launch Hotfix' CHANGELOG.md
           grep -Fq '## What changed' RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md
-          if ! git diff --quiet; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add README.md CHANGELOG.md RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md update.json
-            git commit -m 'Promote Sortify 4.8.4 public frontdoors'
-            git push origin HEAD:main
-          fi
-          printf '%s\n' 'RESULT: SORTIFY_V484_PUBLIC_FRONTDOOR_PROMOTION_PASS'
+          git rm .github/workflows/publish-v484-stable.yml tools/promote-v484-stable.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md CHANGELOG.md RELEASE_NOTES_v4.8.4-webui-action-launch-hotfix.md update.json
+          git commit -m 'Promote Sortify 4.8.4 public frontdoors'
+          git push --force origin "HEAD:refs/heads/$PROMOTION_BRANCH"
+          printf '%s\n' 'RESULT: SORTIFY_V484_PUBLIC_FRONTDOOR_BRANCH_PASS'
