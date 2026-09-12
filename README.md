@@ -1,22 +1,22 @@
 <!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_README_START -->
-## Sortify Dispatch 4.8.4 candidate
+## Sortify Dispatch 4.8.4
 
-Source candidate: `4.8.4-webui-action-launch-hotfix` / `versionCode=31`.
+Current release: `4.8.4-webui-action-launch-hotfix` / `versionCode=31`.
 
-This candidate fixes two WebUI field failures from 4.8.3:
+This release fixes two WebUI failures from 4.8.3:
 
-- the module-manager Action-button launch race where the external browser could reach the one-time `127.0.0.1` bootstrap URL after the standalone WebUI server had already stopped;
-- productive **Sort now** running synchronously through the Action HTTP request, which can take minutes on a large Download tree and surface as a browser network error even while sorting continues.
+- the module-manager Action button no longer opens a loopback URL after its local WebUI server has already stopped;
+- productive **Sort now** no longer depends on one long browser request. Preview stays synchronous and read-only, while productive sorting runs as a background Job and remains observable until completion.
 
-It pins shared WebUI Core 0.6.3. The launcher is detached from the Action shell's stdin/SIGHUP lifetime, while Sort now keeps its synchronous read-only Preview but starts productive sorting through the bounded background Jobs lifecycle. Loopback-only binding, one-time bootstrap authentication, idle/session/job bounds, existing Sortify state, and SDD policy v4115 are preserved.
+Existing Sortify settings and persistent configuration are preserved during the update. Sortify uses shared WebUI Core 0.6.3 and keeps SSH Drop Dispatcher policy `v4115`.
 
-Stable release remains `4.8.3-webui-actions-hotfix` until the exact installed candidate passes both Action-button bootstrap and productive Sort-now device acceptance.
+Install `Sortify-Dispatch-4.8.4-webui-action-launch-hotfix.zip` with a Magisk/KernelSU-compatible module manager and reboot once.
 <!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_README_END -->
 
 <!-- SORTIFY_DISPATCH_V483_WEBUI_ACTIONS_HOTFIX_README_START -->
 ## Sortify Dispatch 4.8.3
 
-Current release: `4.8.3-webui-actions-hotfix`.
+Previous release: `4.8.3-webui-actions-hotfix`.
 
 This hotfix keeps long action output inside a bounded mobile result panel, labels safe read-only actions as **Run check**, preserves detailed action failure messages, reports the installed Sortify version correctly, and keeps focused WebUI form controls visible above the Android software keyboard.
 
@@ -211,7 +211,7 @@ Current release: `v4.4-ssh-drop-dispatcher` / `versionCode=15`.
 
 **Original author:** [xCaptaiN09](https://github.com/xCaptaiN09)
 **Fork maintainer:** [Lycidias93](https://github.com/Lycidias93)
-**Version:** 4.8.3-webui-actions-hotfix
+**Version:** 4.8.4-webui-action-launch-hotfix
 
 Sortify Dispatch is a Magisk / KernelSU module based on Sortify v4.0. It keeps normal download sorting, but adds an Artifact Guard for SSH Drop Dispatcher, Pixel-local scripts, Termux helper scripts, Magisk/KernelSU release ZIPs, and repo helper artifacts.
 
@@ -252,7 +252,7 @@ Sortify Dispatch holds only operational artifacts. Normal downloads are sorted a
 
 ## Installation
 
-1. Download `Sortify-Dispatch-4.8.3-webui-actions-hotfix.zip` from Releases.
+1. Download `Sortify-Dispatch-4.8.4-webui-action-launch-hotfix.zip` from Releases.
 2. Flash through Magisk or KernelSU.
 3. Reboot if your module manager requires it.
 4. Run Sortify manually or wait for the service interval.
@@ -265,7 +265,7 @@ su -c sh /data/adb/modules/sortify/action.sh
 
 ## WebUI
 
-The shared WebUI Core 0.6.1 provides typed Settings, Actions, Jobs and Inventory views through an authenticated loopback session. It can open from the module Action button in the default browser or through compatible embedded WebUI hosts.
+The shared WebUI Core 0.6.3 provides typed Settings, Actions, Jobs and Inventory views through an authenticated loopback session. It can open from the module Action button in the default browser or through compatible embedded WebUI hosts.
 
 ## Online updates
 
