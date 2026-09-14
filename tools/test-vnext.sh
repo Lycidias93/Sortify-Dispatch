@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CORE="$ROOT/.webui-core"
-CORE_COMMIT=6791a05be79f162979c76a286f7cdbdd9ce1cc6b
-CORE_VERSION=0.6.3
+CORE_COMMIT=1763a1885f7734f2bd425e9e079947d921f29240
+CORE_VERSION=0.6.4
 MODE=${1:-all}
 
 required=(
