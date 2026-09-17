@@ -41,6 +41,9 @@ grep -Fq 'bash "$CORE/scripts/integration-test.sh"' "$ROOT/tools/build-release.s
 grep -Fq -- "- '.github/workflows/**'" "$ROOT/.github/workflows/vnext-source-verify.yml"
 grep -Fq 'run: bash ./tools/build-release.sh' "$ROOT/.github/workflows/vnext-source-verify.yml"
 echo 'release_webui_audit_wiring=PASS'
+grep -Fq 'cp -a "$CORE/module/lib" "$STAGE/lib"' "$ROOT/tools/build-release.sh"
+grep -Fq 'diff -qr "$STAGE/lib" "$CORE/module/lib" >/dev/null' "$ROOT/tools/build-release.sh"
+echo 'webui_core_library_packaging=PASS'
 
 # Android/Toybox compatibility: request parsing must use portable POSIX BRE and
 # must not rely on GNU sed's \| alternation extension.
