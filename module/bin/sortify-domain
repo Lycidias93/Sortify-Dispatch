@@ -64,6 +64,15 @@ normalize_config() {
 
 normalize_config
 
+SORTIFY_GUARD_LOG_PREPARED="0"
+SORTIFY_LOG_TIMESTAMP_CACHE=""
+SORTIFY_NAME_CACHE_INPUT=""
+SORTIFY_NAME_CACHE_LOWER=""
+SORTIFY_CUSTOM_PREFIXES_CACHE=""
+SORTIFY_CUSTOM_PREFIXES_CACHE_READY="0"
+SORTIFY_RETENTION_NOW=""
+SORTIFY_RETENTION_CUTOFF_FILE=""
+
 ensure_dirs() {
     mkdir -p "$DEST_BASE/Documents" "$DEST_BASE/Images" "$DEST_BASE/Videos" "$DEST_BASE/Audio" \
              "$DEST_BASE/Archives" "$DEST_BASE/Apps" "$DEST_BASE/Ebooks" "$DEST_BASE/Code" \
@@ -92,9 +101,13 @@ rotate_logs() {
 
 log_guard() {
     [ "${GUARD_LOG:-1}" = "1" ] || return 0
-    ensure_dirs
-    rotate_logs
-    echo "[Guard] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$DEST_BASE/guard.log"
+    if [ "${SORTIFY_GUARD_LOG_PREPARED:-0}" != "1" ]; then
+        rotate_logs
+        SORTIFY_GUARD_LOG_PREPARED="1"
+    fi
+    stamp="${SORTIFY_LOG_TIMESTAMP_CACHE:-}"
+    [ -n "$stamp" ] || stamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "[Guard] $stamp $*" >> "$DEST_BASE/guard.log"
 }
 
 cleanup_guard_temp() {
@@ -128,9 +141,25 @@ custom_prefixes_csv() {
     IFS="$old_ifs"
 }
 
+cache_lower_name() {
+    if [ "${SORTIFY_NAME_CACHE_INPUT:-}" != "$1" ]; then
+        SORTIFY_NAME_CACHE_INPUT="$1"
+        SORTIFY_NAME_CACHE_LOWER="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    fi
+}
+
 custom_park_match_prefix() {
-    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
-    prefixes="$(custom_prefixes_csv)"
+    if [ "${SORTIFY_NAME_CACHE_LOWER:-}" = "$1" ] && [ -n "${SORTIFY_NAME_CACHE_INPUT:-}" ]; then
+        name="$1"
+    else
+        cache_lower_name "$1"
+        name="$SORTIFY_NAME_CACHE_LOWER"
+    fi
+    if [ "${SORTIFY_CUSTOM_PREFIXES_CACHE_READY:-0}" = "1" ]; then
+        prefixes="$SORTIFY_CUSTOM_PREFIXES_CACHE"
+    else
+        prefixes="$(custom_prefixes_csv)"
+    fi
     old_ifs="$IFS"; IFS=","
     for prefix in $prefixes; do
         [ -n "$prefix" ] || continue
@@ -143,7 +172,8 @@ custom_park_match_prefix() {
 is_custom_park_artifact() { [ -n "$(custom_park_match_prefix "$1" 2>/dev/null || true)" ]; }
 
 is_markdown_handover_artifact() {
-    name="$1"; lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+    name="$1"
+    if [ "${SORTIFY_NAME_CACHE_LOWER:-}" = "$name" ]; then lower="$name"; else cache_lower_name "$name"; lower="$SORTIFY_NAME_CACHE_LOWER"; fi
     case "$lower" in
         *handover*.md|readme*.md|release_notes*.md) return 0 ;;
     esac
@@ -236,7 +266,8 @@ dispatcher_sortify_contract_status() {
 pidd_sortify_contract_status() { dispatcher_sortify_contract_status "$@"; }
 
 is_protected_artifact() {
-    name="$1"; lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+    name="$1"
+    if [ "${SORTIFY_NAME_CACHE_LOWER:-}" = "$name" ]; then lower="$name"; else cache_lower_name "$name"; lower="$SORTIFY_NAME_CACHE_LOWER"; fi
     if is_custom_park_artifact "$lower"; then return 0; fi
     if is_markdown_handover_artifact "$lower"; then return 0; fi
     case "$lower" in
@@ -258,12 +289,36 @@ file_mtime_epoch() {
     return 1
 }
 
+prepare_retention_context() {
+    normalize_config
+    SORTIFY_RETENTION_NOW="$(date +%s 2>/dev/null || true)"
+    days="${SORTIFY_PROTECTED_RETENTION_DAYS:-30}"
+    case "$SORTIFY_RETENTION_NOW:$days" in *[!0-9:]*|:*|*:) return 0 ;; esac
+    [ "$days" -gt 0 ] 2>/dev/null || return 0
+    cutoff_epoch=$((SORTIFY_RETENTION_NOW - days * 86400))
+    marker="/data/local/tmp/sortify-retention-cutoff.$$"
+    if command -v toybox >/dev/null 2>&1 && toybox touch -d "@$cutoff_epoch" "$marker" 2>/dev/null; then
+        SORTIFY_RETENTION_CUTOFF_FILE="$marker"
+    elif touch -d "@$cutoff_epoch" "$marker" 2>/dev/null; then
+        SORTIFY_RETENTION_CUTOFF_FILE="$marker"
+    fi
+}
+cleanup_retention_context() {
+    [ -n "${SORTIFY_RETENTION_CUTOFF_FILE:-}" ] && rm -f "$SORTIFY_RETENTION_CUTOFF_FILE" 2>/dev/null || true
+    SORTIFY_RETENTION_CUTOFF_FILE=""
+}
+
 protected_retention_expired() {
     file="$1"; normalize_config
     days="${SORTIFY_PROTECTED_RETENTION_DAYS:-30}"
     [ "$days" -gt 0 ] 2>/dev/null || return 1
+    if [ -n "${SORTIFY_RETENTION_CUTOFF_FILE:-}" ] && [ -e "$SORTIFY_RETENTION_CUTOFF_FILE" ]; then
+        [ "$file" -ot "$SORTIFY_RETENTION_CUTOFF_FILE" ]
+        return $?
+    fi
     mtime="$(file_mtime_epoch "$file" 2>/dev/null || true)"
-    now="$(date +%s 2>/dev/null || true)"
+    now="${SORTIFY_RETENTION_NOW:-}"
+    [ -n "$now" ] || now="$(date +%s 2>/dev/null || true)"
     case "$mtime:$now" in *[!0-9:]*|:*) return 1 ;; esac
     [ "$now" -ge "$mtime" ] 2>/dev/null || return 1
     age_seconds=$((now - mtime)); cutoff_seconds=$((days * 86400))
@@ -271,14 +326,14 @@ protected_retention_expired() {
 }
 
 release_local_hold_if_expired() {
-    file="$1"; reason="$2"; name="$(basename "$file")"
+    file="$1"; reason="$2"; name="${file##*/}"
     protected_retention_expired "$file" || return 1
     log_guard "release local protected artifact file=$name reason=$reason retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS age_source=mtime"
     return 0
 }
 
 should_hold_protected_artifact() {
-    file="$1"; name="$(basename "$file")"; normalize_config
+    file="$1"; name="${file##*/}"; normalize_config
     [ "${SORTIFY_HOLD_PROTECTED:-1}" = "1" ] || return 1
     is_protected_artifact "$name" || return 1
     prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"
@@ -337,7 +392,7 @@ duplicate_target_path() {
 }
 
 handle_existing_destination() {
-    dest="$1"; file="$2"; filename="$(basename "$file")"; existing="$dest/$filename"
+    dest="$1"; file="$2"; filename="${file##*/}"; existing="$dest/$filename"
     normalize_config
     if [ "${SORTIFY_DUPLICATE_MODE:-filename}" = "checksum_delete_identical" ]; then
         src_sha="$(file_sha256 "$file" 2>/dev/null || true)"; dst_sha="$(file_sha256 "$existing" 2>/dev/null || true)"
@@ -359,23 +414,46 @@ handle_existing_destination() {
 }
 
 move_one() {
-    dest="$1"; file="$2"; filename="$(basename "$file")"
+    dest="$1"; file="$2"; filename="${file##*/}"
     is_skip_candidate "$filename" && return 0
     if should_hold_protected_artifact "$file"; then ui_print "KEEP artifact: $filename"; log_guard "keep download=$DOWNLOADS file=$filename integration=$(dispatcher_integration_state)"; return 0; fi
     if is_protected_artifact "$filename"; then log_guard "protected artifact eligible to sort file=$filename hold=${SORTIFY_HOLD_PROTECTED:-1} integration=$(dispatcher_integration_state)"; fi
     if [ -e "$dest/$filename" ]; then handle_existing_destination "$dest" "$file"; else mv -f "$file" "$dest/"; fi
 }
 
-move_files() {
-    dest="$1"; shift
-    for ext in "$@"; do
-        find "$DOWNLOADS" -maxdepth 1 -type f ! -name ".*" ! -name "*.crdownload" ! -name "*.partial" ! -name "*.tmp" -iname "*.$ext" -print 2>/dev/null | while IFS= read -r file; do move_one "$dest" "$file"; done
+set_sort_category() {
+    SORTIFY_CATEGORY="Others"
+    case "$1" in *.*) ext="${1##*.}" ;; *) return 0 ;; esac
+    case "$ext" in
+        pdf|doc|docx|txt|rtf|odt|ods|odp|xls|xlsx|ppt|pptx|md|log|pages|numbers|key) SORTIFY_CATEGORY="Documents" ;;
+        jpg|jpeg|png|gif|bmp|webp|heic|heif|svg|avif|tif|tiff|raw|dng) SORTIFY_CATEGORY="Images" ;;
+        mp4|mkv|avi|mov|webm|flv|mpeg|mpg|3gp|m4v|ts|mts) SORTIFY_CATEGORY="Videos" ;;
+        mp3|m4a|flac|wav|ogg|opus|aac|wma|mid|midi) SORTIFY_CATEGORY="Audio" ;;
+        zip|rar|7z|tar|gz|bz2|xz|tgz|txz|tbz|tbz2|iso|cab|arj|lz4|zst) SORTIFY_CATEGORY="Archives" ;;
+        apk|exe|apks|apkm|xapk|dmg|deb|rpm|msi) SORTIFY_CATEGORY="Apps" ;;
+        epub|mobi|azw|azw3|fb2|djvu|cbz|cbr) SORTIFY_CATEGORY="Ebooks" ;;
+        sh|bash|zsh|fish|py|pyw|js|ts|jsx|tsx|java|kt|kts|go|rs|c|cc|cpp|cxx|h|hpp|cs|php|rb|pl|lua|sql|html|htm|css|scss|sass|ipynb|gradle) SORTIFY_CATEGORY="Code" ;;
+        conf|cfg|ini|env|toml|properties|service|timer|desktop|plist|reg|yaml|yml|xml|json|json5) SORTIFY_CATEGORY="Config" ;;
+        csv|tsv|jsonl|ndjson|db|sqlite|sqlite3|parquet|feather|arrow|dump) SORTIFY_CATEGORY="Data" ;;
+        ttf|otf|woff|woff2|eot) SORTIFY_CATEGORY="Fonts" ;;
+        pem|crt|cer|csr|p12|pfx|pub|asc|sig|key) SORTIFY_CATEGORY="Certificates" ;;
+        bak|backup|old|orig|img|qcow2|vdi|vmdk|sparseimage|ab) SORTIFY_CATEGORY="Backups" ;;
+        torrent|magnet) SORTIFY_CATEGORY="Torrents" ;;
+    esac
+}
+
+sort_downloads_single_pass() {
+    find "$DOWNLOADS" -maxdepth 1 -type f ! -name ".*" ! -name "*.crdownload" ! -name "*.partial" ! -name "*.tmp" -print 2>/dev/null | while IFS= read -r file; do
+        name="${file##*/}"
+        cache_lower_name "$name"
+        set_sort_category "$SORTIFY_NAME_CACHE_LOWER"
+        move_one "$DEST_BASE/$SORTIFY_CATEGORY" "$file"
     done
 }
 
 find_protected_under() {
     dir="$1"; [ -d "$dir" ] || return 0; normalize_config; limit="${SORTIFY_GUARD_MAX_FILES:-300}"
-    find "$dir" -maxdepth 1 -type f -print 2>/dev/null | while IFS= read -r file; do name="$(basename "$file")"; if is_protected_artifact "$name"; then printf '%s\n' "$file"; fi; done | sed -n "1,${limit}p"
+    find "$dir" -maxdepth 1 -type f -print 2>/dev/null | while IFS= read -r file; do name="${file##*/}"; if is_protected_artifact "$name"; then printf '%s\n' "$file"; fi; done | sed -n "1,${limit}p"
 }
 
 find_misplaced_protected() {
@@ -422,7 +500,7 @@ guard_clean() {
     total=0; restored=0; conflicts=0
     while IFS= read -r file; do
         [ -n "$file" ] && [ -f "$file" ] || continue
-        total=$((total + 1)); name="$(basename "$file")"; target="$DOWNLOADS/$name"
+        total=$((total + 1)); name="${file##*/}"; target="$DOWNLOADS/$name"
         if [ -e "$target" ]; then mkdir -p "$conflict_dir"; mv -f "$file" "$conflict_dir/$name"; conflicts=$((conflicts + 1)); log_guard "clean conflict source=$file target=$target conflict_dir=$conflict_dir"; else mv -f "$file" "$target"; restored=$((restored + 1)); log_guard "clean restored source=$file target=$target"; fi
     done < "$tmp_misplaced"
     rm -f "$tmp_misplaced"
@@ -867,7 +945,7 @@ sortify_category_for_name() {
 
 sortify_preview_one() {
     file="$1"
-    filename="$(basename "$file")"
+    filename="${file##*/}"
     is_skip_candidate "$filename" && { echo "file=$filename action=skip reason=temp_or_hidden target=$file"; return 0; }
     if should_hold_protected_artifact "$file"; then
         echo "file=$filename action=hold reason=protected_or_dispatcher_contract target=$DOWNLOADS/$filename"
@@ -924,12 +1002,17 @@ sortify_service_cycle() {
 }
 
 sort_now() {
-    normalize_config; ensure_dirs; rotate_logs; [ "$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT" = "1" ] && cleanup_guard_temp >/dev/null 2>&1 || true
+    normalize_config; ensure_dirs; rotate_logs; SORTIFY_GUARD_LOG_PREPARED="1"
+    [ "$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT" = "1" ] && cleanup_guard_temp >/dev/null 2>&1 || true
     if [ "${SORTIFY_NORMAL_SORT:-1}" != "1" ]; then ui_print "Sortify normal sorting disabled by config"; log_guard "SORTIFY_NORMAL_SORT disabled; skipping sort"; return 0; fi
     require_dispatcher_if_needed || return $?
+    SORTIFY_CUSTOM_PREFIXES_CACHE="$(custom_prefixes_csv)"
+    SORTIFY_CUSTOM_PREFIXES_CACHE_READY="1"
+    SORTIFY_LOG_TIMESTAMP_CACHE="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo now)"
+    prepare_retention_context
     ui_print "▶ Sortify Dispatch: Manual sort started"
-    move_files "$DEST_BASE/Documents" $DOC_EXT; move_files "$DEST_BASE/Images" $IMG_EXT; move_files "$DEST_BASE/Videos" $VID_EXT; move_files "$DEST_BASE/Audio" $AUD_EXT; move_files "$DEST_BASE/Archives" $ARC_EXT; move_files "$DEST_BASE/Apps" $APP_EXT; move_files "$DEST_BASE/Ebooks" $EBOOK_EXT; move_files "$DEST_BASE/Code" $CODE_EXT; move_files "$DEST_BASE/Config" $CONFIG_EXT; move_files "$DEST_BASE/Data" $DATA_EXT; move_files "$DEST_BASE/Fonts" $FONT_EXT; move_files "$DEST_BASE/Certificates" $CERT_EXT; move_files "$DEST_BASE/Backups" $BACKUP_EXT; move_files "$DEST_BASE/Torrents" $TORRENT_EXT
-    find "$DOWNLOADS" -maxdepth 1 -type f ! -name ".*" ! -name "*.crdownload" ! -name "*.partial" ! -name "*.tmp" -print 2>/dev/null | while IFS= read -r file; do move_one "$DEST_BASE/Others" "$file"; done
+    sort_downloads_single_pass
+    cleanup_retention_context
     date "+[%Y-%m-%d %H:%M:%S] Manual sort triggered" >> "$DEST_BASE/sortify.log"
     ui_print "✔ Sortify Dispatch: Manual sort completed"
 }
