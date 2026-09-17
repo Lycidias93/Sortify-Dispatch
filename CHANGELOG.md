@@ -1,3 +1,11 @@
+<!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_CHANGELOG_START -->
+## 4.8.8-webui-action-sighup-hotfix - Magisk Action WebUI lifetime
+
+- Fixed the Magisk **Action** browser launch sometimes reaching a stopped `127.0.0.1` WebUI server.
+- Updated the shared WebUI Core so the standalone server survives the Action shell ending.
+- Existing Sortify settings and sorting behavior remain unchanged.
+<!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_CHANGELOG_END -->
+
 <!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_CHANGELOG_START -->
 ## 4.8.7-sort-performance - Single-pass productive sorting
 

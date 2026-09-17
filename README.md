@@ -1,3 +1,11 @@
+<!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_README_START -->
+## vNext: Sortify Dispatch 4.8.8
+
+Candidate hotfix for the Magisk **Action** button: the standalone loopback WebUI server now uses shared WebUI Core 0.6.6, which keeps the server alive after the Action shell exits instead of leaving the browser on `ERR_CONNECTION_REFUSED`. Existing Sortify settings and sorting behavior are unchanged.
+
+Stable `update.json` remains on 4.8.7 until exact-device Action-button acceptance passes.
+<!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_README_END -->
+
 <!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_README_START -->
 ## Sortify Dispatch 4.8.7
 
