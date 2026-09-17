@@ -1,3 +1,11 @@
+<!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_README_START -->
+## vNext: 4.8.6 protected retention
+
+The next candidate adds **Local protected retention** to Settings. Default: `30` days; `0` disables automatic age release. The age gate uses the protected file's mtime and applies only to local holds such as `pixel_local__*`, custom park prefixes and markdown/handover files. Remote `target-*` / `targets-*` artifacts never bypass their dispatcher release marker because of age.
+
+This is a source candidate only; stable `update.json` is unchanged until exact-device acceptance.
+<!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_README_END -->
+
 <!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_README_START -->
 ## Sortify Dispatch 4.8.4
 
