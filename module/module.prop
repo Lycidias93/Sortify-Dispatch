@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.8.7-sort-performance
-versionCode=34
+version=4.8.8-webui-action-sighup-hotfix
+versionCode=35
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch with single-pass sorting, 30-day local protected-artifact retention, reliable WebUI jobs, persistent config and SDD policy v4115.
+description=Sortify Dispatch with SIGHUP-safe Magisk Action WebUI, single-pass sorting, protected retention, persistent config and SDD policy v4115.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
