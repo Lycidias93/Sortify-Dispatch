@@ -5,6 +5,7 @@
 - Age-based release applies only to local/custom-prefix/markdown-handover holds and uses file mtime.
 - `target-*` and `targets-*` remain strictly dispatcher-marker gated regardless of age.
 - Added focused retention fixtures and persistent-config migration coverage.
+- Updated shared WebUI Core to `0.6.5` so the standalone Action loopback server survives launcher SIGHUP/exit before browser bootstrap.
 <!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_CHANGELOG_END -->
 
 <!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_CHANGELOG_START -->
