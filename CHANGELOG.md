@@ -1,3 +1,12 @@
+<!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_CHANGELOG_START -->
+## 4.8.7-sort-performance - Single-pass productive sorting
+
+- Replaced repeated per-extension Download scans with one productive sort pass.
+- Removed per-file guard-log rotation and reused one timestamp during a productive pass.
+- Cached filename normalization, custom prefixes and the retention cutoff for the pass.
+- Keeps protected-artifact, duplicate and dispatcher-marker semantics unchanged.
+<!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_CHANGELOG_END -->
+
 <!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_CHANGELOG_START -->
 ## 4.8.6-protected-retention - Local protected-artifact retention
 

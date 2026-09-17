@@ -178,6 +178,7 @@ echo 'stale_config_lock_recovery=PASS'
 echo 'installer_webui_server_mode=PASS'
 echo 'reserved_prefix_reject=PASS'
 bash "$ROOT/tools/test-protected-retention.sh"
+bash "$ROOT/tools/test-sort-single-pass-performance.sh"
 
 cat > "$TMP/runtime/requests/action-failure.json" <<'JSON'
 {"dry_run":false}

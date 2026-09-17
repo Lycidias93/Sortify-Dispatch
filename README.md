@@ -1,3 +1,11 @@
+<!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_README_START -->
+## vNext: 4.8.7 sort performance
+
+The next candidate keeps the 4.8.6 protected-retention semantics but replaces the pathological productive sort hot path with a single Download scan and cached guard/retention context. This addresses the exact-device 15-minute acceptance failure where `sort-now` was still genuinely running after 940 seconds.
+
+Stable `update.json` remains unchanged until the repaired candidate passes exact-device acceptance.
+<!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_README_END -->
+
 <!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_README_START -->
 ## vNext: 4.8.6 protected retention
 
