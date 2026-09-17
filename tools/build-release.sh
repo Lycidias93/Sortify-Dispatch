@@ -31,6 +31,8 @@ mkdir -p "$STAGE"
 cp -a "$MODULE_SRC/." "$STAGE/"
 cp -a "$CORE/module/META-INF" "$STAGE/"
 cp -f "$CORE/module/action.sh" "$STAGE/action.sh"
+rm -rf "$STAGE/lib"
+cp -a "$CORE/module/lib" "$STAGE/lib"
 rm -rf "$STAGE/webroot"
 cp -a "$CORE/module/webroot" "$STAGE/webroot"
 mkdir -p "$STAGE/bin" "$STAGE/tools" "$STAGE/third_party/licenses"
@@ -54,12 +56,13 @@ cp -f "$CORE"/third_party/licenses/*.LICENSE "$STAGE/third_party/licenses/"
 
 chmod 0755 "$STAGE/action.sh" "$STAGE/service.sh" "$STAGE/customize.sh" "$STAGE/uninstall.sh" \
   "$STAGE/bin/module-control" "$STAGE/bin/sortify-domain" "$STAGE/bin/webui-server-arm64" \
-  "$STAGE/tools/sortify-download-cleanup.sh"
+  "$STAGE/tools/sortify-download-cleanup.sh" "$STAGE/lib/ntfy.sh"
 chmod 0644 "$STAGE/module.prop" "$STAGE/config/sortify.conf.default" "$STAGE"/webroot/* \
   "$STAGE/LICENSE" "$STAGE/WEBUI_CORE_NOTICE" "$STAGE/WEBUI_CORE_CREDITS.md" \
   "$STAGE/WEBUI_CORE_UPSTREAMS.md" "$STAGE"/third_party/licenses/*.LICENSE
 
 cmp "$STAGE/action.sh" "$CORE/module/action.sh"
+diff -qr "$STAGE/lib" "$CORE/module/lib" >/dev/null
 diff -qr "$STAGE/webroot" "$CORE/module/webroot" >/dev/null
 [[ -s "$STAGE/LICENSE" ]]
 [[ -s "$STAGE/WEBUI_CORE_NOTICE" ]]
