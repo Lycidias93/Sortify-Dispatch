@@ -15,6 +15,9 @@ GUARD_LOG="${GUARD_LOG:-1}"
 SORTIFY_DISPATCHER_INTEGRATION="${SORTIFY_DISPATCHER_INTEGRATION:-auto}"
 SORTIFY_HOLD_PROTECTED="${SORTIFY_HOLD_PROTECTED:-1}"
 SORTIFY_PROTECTED_RETENTION_DAYS="${SORTIFY_PROTECTED_RETENTION_DAYS:-30}"
+SORTIFY_REMOTE_PROTECTED_RELEASE_MODE="${SORTIFY_REMOTE_PROTECTED_RELEASE_MODE:-marker_only}"
+SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS="${SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS:-14}"
+SORTIFY_NTFY_MODE="${SORTIFY_NTFY_MODE:-all}"
 SORTIFY_NORMAL_SORT="${SORTIFY_NORMAL_SORT:-1}"
 SORTIFY_SORT_MODE="${SORTIFY_SORT_MODE:-interval}"
 SORTIFY_CUSTOM_PARK_PREFIXES="${SORTIFY_CUSTOM_PARK_PREFIXES:-}"
@@ -41,6 +44,10 @@ normalize_config() {
     case "${SORTIFY_HOLD_PROTECTED:-1}" in 0|1) ;; *) SORTIFY_HOLD_PROTECTED="1" ;; esac
     case "${SORTIFY_PROTECTED_RETENTION_DAYS:-30}" in ""|*[!0-9]*) SORTIFY_PROTECTED_RETENTION_DAYS="30" ;; esac
     [ "$SORTIFY_PROTECTED_RETENTION_DAYS" -gt 3650 ] 2>/dev/null && SORTIFY_PROTECTED_RETENTION_DAYS="3650"
+    case "${SORTIFY_REMOTE_PROTECTED_RELEASE_MODE:-marker_only}" in marker_only|marker_or_age) ;; *) SORTIFY_REMOTE_PROTECTED_RELEASE_MODE="marker_only" ;; esac
+    case "${SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS:-14}" in ""|*[!0-9]*) SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS="14" ;; esac
+    [ "$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS" -gt 3650 ] 2>/dev/null && SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS="3650"
+    case "${SORTIFY_NTFY_MODE:-all}" in off|fail|success_fail|all) ;; *) SORTIFY_NTFY_MODE="all" ;; esac
     case "${SORTIFY_NORMAL_SORT:-1}" in 0|1) ;; *) SORTIFY_NORMAL_SORT="1" ;; esac
     case "${SORTIFY_SORT_MODE:-interval}" in interval|manual|boot_once) ;; *) SORTIFY_SORT_MODE="interval" ;; esac
     case "${SORTIFY_DUPLICATE_MODE:-filename}" in filename|checksum_delete_identical) ;; *) SORTIFY_DUPLICATE_MODE="filename" ;; esac
@@ -325,6 +332,24 @@ protected_retention_expired() {
     [ "$age_seconds" -ge "$cutoff_seconds" ]
 }
 
+
+remote_protected_retention_expired() {
+    file="$1"; normalize_config
+    [ "$SORTIFY_REMOTE_PROTECTED_RELEASE_MODE" = marker_or_age ] || return 1
+    days="$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS"; [ "$days" -gt 0 ] 2>/dev/null || return 1
+    mtime="$(file_mtime_epoch "$file" 2>/dev/null || true)"; now="${SORTIFY_RETENTION_NOW:-}"; [ -n "$now" ] || now="$(date +%s 2>/dev/null || true)"
+    case "$mtime:$now" in *[!0-9:]*|:*) return 1 ;; esac
+    [ "$now" -ge "$mtime" ] 2>/dev/null || return 1
+    [ $((now - mtime)) -ge $((days * 86400)) ]
+}
+
+release_remote_hold_if_expired() {
+    file="$1"; name="${file##*/}"
+    remote_protected_retention_expired "$file" || return 1
+    log_guard "release remote protected artifact file=$name reason=remote_retention_fallback retention_days=$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS age_source=mtime"
+    return 0
+}
+
 release_local_hold_if_expired() {
     file="$1"; reason="$2"; name="${file##*/}"
     protected_retention_expired "$file" || return 1
@@ -350,7 +375,8 @@ should_hold_protected_artifact() {
             if dispatcher_sortify_contract_released "$file" 2>/dev/null || pidd_sortify_contract_released "$file" 2>/dev/null; then
                 log_guard "release remote protected artifact file=$name contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"; return 1
             fi
-            log_guard "hold remote protected artifact file=$name integration=$(dispatcher_integration_state) contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"; return 0 ;;
+            if release_remote_hold_if_expired "$file"; then return 1; fi
+            log_guard "hold remote protected artifact file=$name integration=$(dispatcher_integration_state) contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || echo unavailable) remote_release_mode=$SORTIFY_REMOTE_PROTECTED_RELEASE_MODE remote_retention_days=$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS"; return 0 ;;
         pixel_local__*|pixel-termux*|pixel_termux*|termux-*|termux_*|repo_*)
             if release_local_hold_if_expired "$file" "pixel_local_hold_only"; then return 1; fi
             log_guard "hold local protected artifact file=$name dispatcher_marker_required=no reason=pixel_local_hold_only retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; return 0 ;;
@@ -509,7 +535,7 @@ guard_clean() {
 
 sortify_config_status() {
     normalize_config
-    echo "== Sortify Dispatch Config =="; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "conf_path=$CONF_PATH"; echo "guard_log=${GUARD_LOG:-1}"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "sortify_sort_mode=$SORTIFY_SORT_MODE"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_protected_retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"; echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "sortify_duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "sortify_log_max_kb=$SORTIFY_LOG_MAX_KB"; echo "sortify_guard_temp_clean_on_sort=$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT"; echo "sortify_preview_max_files=$SORTIFY_PREVIEW_MAX_FILES"; echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"; echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"; echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "sortify_contract=policy_v4115_sha_size_authority_pending"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
+    echo "== Sortify Dispatch Config =="; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "conf_path=$CONF_PATH"; echo "guard_log=${GUARD_LOG:-1}"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "sortify_sort_mode=$SORTIFY_SORT_MODE"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_protected_retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; echo "sortify_remote_protected_release_mode=$SORTIFY_REMOTE_PROTECTED_RELEASE_MODE"; echo "sortify_remote_protected_retention_days=$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS"; echo "sortify_ntfy_mode=$SORTIFY_NTFY_MODE"; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"; echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "sortify_duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "sortify_log_max_kb=$SORTIFY_LOG_MAX_KB"; echo "sortify_guard_temp_clean_on_sort=$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT"; echo "sortify_preview_max_files=$SORTIFY_PREVIEW_MAX_FILES"; echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"; echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"; echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "sortify_contract=policy_v4115_sha_size_authority_pending"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
 }
 
 duplicate_status() { normalize_config; echo "== Sortify Dispatch Duplicate Handling =="; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "checksum_delete_identical_supported=yes"; echo "identical_checksum_action=delete_source"; echo "same_name_different_checksum_action=move_to_duplicates"; echo "checksum_unavailable_action=move_to_duplicates"; }
@@ -1001,20 +1027,54 @@ sortify_service_cycle() {
     esac
 }
 
+
+sortify_ntfy_allowed() {
+    event="$1"; normalize_config
+    case "$SORTIFY_NTFY_MODE:$event" in all:start|all:success|all:fail|success_fail:success|success_fail:fail|fail:fail) return 0 ;; *) return 1 ;; esac
+}
+
+sortify_notify() {
+    event="$1"; detail="$2"
+    sortify_ntfy_allowed "$event" || return 0
+    lib="$MODULE_DIR/lib/ntfy.sh"; [ -r "$lib" ] || { log_guard "ntfy lifecycle=$event state=helper_missing"; return 0; }
+    . "$lib"
+    NTFY_ENABLED=0; NTFY_URL=""; NTFY_TOPIC=""; NTFY_TOKEN_FILE=""; NTFY_PRIORITY=default; NTFY_TAGS=package
+    cfg="${SORTIFY_NTFY_FALLBACK_CONFIG:-$PIDD_RUNTIME_DIR/config.env}"
+    [ -r "$cfg" ] && webui_ntfy_load_config_file "$cfg" >/dev/null 2>&1 || true
+    case "$event" in start) status=INFO; title='🔵 Sortify START' ;; success) status=PASS; title='🟢 Sortify SUCCESS' ;; fail) status=FAIL; title='🔴 Sortify FAIL' ;; *) status=INFO; title='🔵 Sortify' ;; esac
+    out=$(webui_ntfy_send "$status" "$title" "$detail" 'package,card_file_box' default 2>/dev/null || true)
+    state=$(printf '%s\n' "$out" | sed -n 's/^ntfy_send_state=//p' | head -n 1); [ -n "$state" ] || state=unavailable
+    log_guard "ntfy lifecycle=$event state=$state mode=$SORTIFY_NTFY_MODE source=sdd"
+    return 0
+}
+
 sort_now() {
     normalize_config; ensure_dirs; rotate_logs; SORTIFY_GUARD_LOG_PREPARED="1"
     [ "$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT" = "1" ] && cleanup_guard_temp >/dev/null 2>&1 || true
     if [ "${SORTIFY_NORMAL_SORT:-1}" != "1" ]; then ui_print "Sortify normal sorting disabled by config"; log_guard "SORTIFY_NORMAL_SORT disabled; skipping sort"; return 0; fi
-    require_dispatcher_if_needed || return $?
+    started_epoch="$(date +%s 2>/dev/null || echo 0)"
+    sortify_notify start "version=$MODULE_VERSION mode=$SORTIFY_SORT_MODE local_retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS remote_release_mode=$SORTIFY_REMOTE_PROTECTED_RELEASE_MODE remote_retention_days=$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS"
+    require_dispatcher_if_needed
+    rc=$?
+    if [ "$rc" != "0" ]; then sortify_notify fail "version=$MODULE_VERSION phase=dispatcher_preflight rc=$rc"; return "$rc"; fi
     SORTIFY_CUSTOM_PREFIXES_CACHE="$(custom_prefixes_csv)"
     SORTIFY_CUSTOM_PREFIXES_CACHE_READY="1"
     SORTIFY_LOG_TIMESTAMP_CACHE="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo now)"
     prepare_retention_context
     ui_print "▶ Sortify Dispatch: Manual sort started"
     sort_downloads_single_pass
+    rc=$?
     cleanup_retention_context
-    date "+[%Y-%m-%d %H:%M:%S] Manual sort triggered" >> "$DEST_BASE/sortify.log"
-    ui_print "✔ Sortify Dispatch: Manual sort completed"
+    ended_epoch="$(date +%s 2>/dev/null || echo 0)"; duration=unknown
+    case "$started_epoch:$ended_epoch" in *[!0-9:]*|:*) ;; *) [ "$ended_epoch" -ge "$started_epoch" ] 2>/dev/null && duration=$((ended_epoch - started_epoch)) ;; esac
+    if [ "$rc" = "0" ]; then
+        date "+[%Y-%m-%d %H:%M:%S] Manual sort triggered" >> "$DEST_BASE/sortify.log"
+        sortify_notify success "version=$MODULE_VERSION duration_seconds=$duration local_retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS remote_release_mode=$SORTIFY_REMOTE_PROTECTED_RELEASE_MODE remote_retention_days=$SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS"
+        ui_print "✔ Sortify Dispatch: Manual sort completed"
+    else
+        sortify_notify fail "version=$MODULE_VERSION phase=sort duration_seconds=$duration rc=$rc"
+    fi
+    return "$rc"
 }
 
 case "${1:-sort}" in
