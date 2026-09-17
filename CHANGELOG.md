@@ -7,6 +7,13 @@
 - Keeps protected-artifact, duplicate and dispatcher-marker semantics unchanged.
 <!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_CHANGELOG_END -->
 
+<!-- SORTIFY_DISPATCH_V485_SESSION_LIFETIME_CHANGELOG_START -->
+## 4.8.5-webui-session-lifetime-hotfix - WebUI session lifetime
+
+- Fixed authentication expiring while supported long-running background **Sort now** jobs are active.
+- Existing settings and persistent configuration remain preserved.
+<!-- SORTIFY_DISPATCH_V485_SESSION_LIFETIME_CHANGELOG_END -->
+
 <!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_CHANGELOG_START -->
 ## 4.8.6-protected-retention - Local protected-artifact retention
 

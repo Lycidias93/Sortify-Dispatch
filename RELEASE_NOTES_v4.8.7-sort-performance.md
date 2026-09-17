@@ -1,10 +1,13 @@
-# Sortify Dispatch 4.8.7 sort performance
+# Sortify Dispatch 4.8.7 - Protected retention and faster sorting
 
-Candidate repair for the exact-device long-job acceptance failure.
+## What changed
 
-- One productive Download scan instead of repeated per-extension scans.
-- Guard-log rotation is prepared once per productive pass.
-- Filename normalization, custom-prefix parsing and retention cutoff are cached for the pass.
-- Protected retention remains 30 days by default; `0` still means indefinite local hold.
-- `target-*` and `targets-*` remain dispatcher-marker gated.
-- Stable update metadata is intentionally unchanged pending exact-device acceptance.
+- Fixed WebUI sessions expiring while a supported long-running background **Sort now** job is active.
+- Added configurable local protected-artifact retention with a 30-day default; `0` keeps local holds indefinitely.
+- Kept `target-*` and `targets-*` artifacts strictly dispatcher-marker gated regardless of age.
+- Reworked productive sorting to use one Download pass with cached guard and retention context, substantially reducing runtime on large protected Download trees.
+- Existing Sortify settings and persistent configuration are preserved across the update.
+
+## Update
+
+Install the module update with a Magisk/KernelSU-compatible module manager and reboot once.

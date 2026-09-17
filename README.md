@@ -1,9 +1,11 @@
 <!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_README_START -->
-## vNext: 4.8.7 sort performance
+## Sortify Dispatch 4.8.7
 
-The next candidate keeps the 4.8.6 protected-retention semantics but replaces the pathological productive sort hot path with a single Download scan and cached guard/retention context. This addresses the exact-device 15-minute acceptance failure where `sort-now` was still genuinely running after 940 seconds.
+Current release: `4.8.7-sort-performance` / `versionCode=34`.
 
-Stable `update.json` remains unchanged until the repaired candidate passes exact-device acceptance.
+This release keeps long-running WebUI jobs authenticated, adds 30-day configurable retention for local protected artifacts, and makes productive sorting much faster on large Download trees by using a single scan with cached guard/retention context. Remote `target-*` / `targets-*` artifacts remain dispatcher-marker gated regardless of age.
+
+Existing Sortify settings and persistent configuration are preserved during the update. Install with a Magisk/KernelSU-compatible module manager and reboot once.
 <!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_README_END -->
 
 <!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_README_START -->
