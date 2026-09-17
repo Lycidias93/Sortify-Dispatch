@@ -14,6 +14,7 @@ MODULE_VERSION="$(sed -n 's/^version=//p' "$MODULE_DIR/module.prop" 2>/dev/null 
 GUARD_LOG="${GUARD_LOG:-1}"
 SORTIFY_DISPATCHER_INTEGRATION="${SORTIFY_DISPATCHER_INTEGRATION:-auto}"
 SORTIFY_HOLD_PROTECTED="${SORTIFY_HOLD_PROTECTED:-1}"
+SORTIFY_PROTECTED_RETENTION_DAYS="${SORTIFY_PROTECTED_RETENTION_DAYS:-30}"
 SORTIFY_NORMAL_SORT="${SORTIFY_NORMAL_SORT:-1}"
 SORTIFY_SORT_MODE="${SORTIFY_SORT_MODE:-interval}"
 SORTIFY_CUSTOM_PARK_PREFIXES="${SORTIFY_CUSTOM_PARK_PREFIXES:-}"
@@ -38,6 +39,8 @@ fi
 normalize_config() {
     case "${SORTIFY_DISPATCHER_INTEGRATION:-auto}" in off|auto|on) ;; *) SORTIFY_DISPATCHER_INTEGRATION="auto" ;; esac
     case "${SORTIFY_HOLD_PROTECTED:-1}" in 0|1) ;; *) SORTIFY_HOLD_PROTECTED="1" ;; esac
+    case "${SORTIFY_PROTECTED_RETENTION_DAYS:-30}" in ""|*[!0-9]*) SORTIFY_PROTECTED_RETENTION_DAYS="30" ;; esac
+    [ "$SORTIFY_PROTECTED_RETENTION_DAYS" -gt 3650 ] 2>/dev/null && SORTIFY_PROTECTED_RETENTION_DAYS="3650"
     case "${SORTIFY_NORMAL_SORT:-1}" in 0|1) ;; *) SORTIFY_NORMAL_SORT="1" ;; esac
     case "${SORTIFY_SORT_MODE:-interval}" in interval|manual|boot_once) ;; *) SORTIFY_SORT_MODE="interval" ;; esac
     case "${SORTIFY_DUPLICATE_MODE:-filename}" in filename|checksum_delete_identical) ;; *) SORTIFY_DUPLICATE_MODE="filename" ;; esac
@@ -248,13 +251,45 @@ is_protected_artifact() {
     return 1
 }
 
+file_mtime_epoch() {
+    file="$1"
+    if command -v stat >/dev/null 2>&1; then stat -c %Y "$file" 2>/dev/null && return 0; fi
+    if command -v toybox >/dev/null 2>&1; then toybox stat -c %Y "$file" 2>/dev/null && return 0; fi
+    return 1
+}
+
+protected_retention_expired() {
+    file="$1"; normalize_config
+    days="${SORTIFY_PROTECTED_RETENTION_DAYS:-30}"
+    [ "$days" -gt 0 ] 2>/dev/null || return 1
+    mtime="$(file_mtime_epoch "$file" 2>/dev/null || true)"
+    now="$(date +%s 2>/dev/null || true)"
+    case "$mtime:$now" in *[!0-9:]*|:*) return 1 ;; esac
+    [ "$now" -ge "$mtime" ] 2>/dev/null || return 1
+    age_seconds=$((now - mtime)); cutoff_seconds=$((days * 86400))
+    [ "$age_seconds" -ge "$cutoff_seconds" ]
+}
+
+release_local_hold_if_expired() {
+    file="$1"; reason="$2"; name="$(basename "$file")"
+    protected_retention_expired "$file" || return 1
+    log_guard "release local protected artifact file=$name reason=$reason retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS age_source=mtime"
+    return 0
+}
+
 should_hold_protected_artifact() {
     file="$1"; name="$(basename "$file")"; normalize_config
     [ "${SORTIFY_HOLD_PROTECTED:-1}" = "1" ] || return 1
     is_protected_artifact "$name" || return 1
     prefix="$(custom_park_match_prefix "$name" 2>/dev/null || true)"
-    if [ -n "$prefix" ]; then log_guard "hold custom park artifact file=$name prefix=$prefix dispatcher_marker_required=no"; return 0; fi
-    if is_markdown_handover_artifact "$name"; then log_guard "hold markdown/handover artifact file=$name dispatcher_marker_required=no reason=markdown_handover_hold"; return 0; fi
+    if [ -n "$prefix" ]; then
+        if release_local_hold_if_expired "$file" "custom_prefix:$prefix"; then return 1; fi
+        log_guard "hold custom park artifact file=$name prefix=$prefix dispatcher_marker_required=no retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; return 0
+    fi
+    if is_markdown_handover_artifact "$name"; then
+        if release_local_hold_if_expired "$file" "markdown_handover_hold"; then return 1; fi
+        log_guard "hold markdown/handover artifact file=$name dispatcher_marker_required=no reason=markdown_handover_hold retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; return 0
+    fi
     case "$name" in
         target-pi3__*|target-pi4__*|target-zeropi2__*|target-berylax__*|targets-*__*)
             if dispatcher_sortify_contract_released "$file" 2>/dev/null || pidd_sortify_contract_released "$file" 2>/dev/null; then
@@ -262,7 +297,8 @@ should_hold_protected_artifact() {
             fi
             log_guard "hold remote protected artifact file=$name integration=$(dispatcher_integration_state) contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"; return 0 ;;
         pixel_local__*|pixel-termux*|pixel_termux*|termux-*|termux_*|repo_*)
-            log_guard "hold local protected artifact file=$name dispatcher_marker_required=no reason=pixel_local_hold_only"; return 0 ;;
+            if release_local_hold_if_expired "$file" "pixel_local_hold_only"; then return 1; fi
+            log_guard "hold local protected artifact file=$name dispatcher_marker_required=no reason=pixel_local_hold_only retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; return 0 ;;
     esac
     if dispatcher_sortify_contract_released "$file" 2>/dev/null || pidd_sortify_contract_released "$file" 2>/dev/null; then
         log_guard "release protected artifact file=$name contract=$(dispatcher_sortify_contract_status "$file" 2>/dev/null || echo unavailable)"; return 1
@@ -395,12 +431,12 @@ guard_clean() {
 
 sortify_config_status() {
     normalize_config
-    echo "== Sortify Dispatch Config =="; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "conf_path=$CONF_PATH"; echo "guard_log=${GUARD_LOG:-1}"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "sortify_sort_mode=$SORTIFY_SORT_MODE"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"; echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "sortify_duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "sortify_log_max_kb=$SORTIFY_LOG_MAX_KB"; echo "sortify_guard_temp_clean_on_sort=$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT"; echo "sortify_preview_max_files=$SORTIFY_PREVIEW_MAX_FILES"; echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"; echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"; echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "sortify_contract=policy_v4115_sha_size_authority_pending"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
+    echo "== Sortify Dispatch Config =="; echo "download=$DOWNLOADS"; echo "dest_base=$DEST_BASE"; echo "conf_path=$CONF_PATH"; echo "guard_log=${GUARD_LOG:-1}"; echo "sortify_normal_sort=$SORTIFY_NORMAL_SORT"; echo "sortify_sort_mode=$SORTIFY_SORT_MODE"; echo "sortify_hold_protected=$SORTIFY_HOLD_PROTECTED"; echo "sortify_protected_retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; echo "sortify_dispatcher_integration=$SORTIFY_DISPATCHER_INTEGRATION"; echo "sortify_custom_park_prefixes=$(custom_prefixes_csv)"; echo "sortify_guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "sortify_guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "sortify_duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "sortify_log_max_kb=$SORTIFY_LOG_MAX_KB"; echo "sortify_guard_temp_clean_on_sort=$SORTIFY_GUARD_TEMP_CLEAN_ON_SORT"; echo "sortify_preview_max_files=$SORTIFY_PREVIEW_MAX_FILES"; echo "dispatcher_runtime_dir=$PIDD_RUNTIME_DIR"; echo "legacy_pidd_runtime_dir=$PIDD_RUNTIME_DIR"; echo "dispatcher_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "legacy_pidd_sortify_release_dir=$PIDD_SORTIFY_RELEASE_DIR"; echo "dispatcher_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "legacy_pidd_sortify_required_policy=$PIDD_SORTIFY_REQUIRED_POLICY"; echo "sortify_contract=policy_v4115_sha_size_authority_pending"; echo "dispatcher_integration_state=$(dispatcher_integration_state)"
 }
 
 duplicate_status() { normalize_config; echo "== Sortify Dispatch Duplicate Handling =="; echo "duplicate_mode=$SORTIFY_DUPLICATE_MODE"; echo "checksum_delete_identical_supported=yes"; echo "identical_checksum_action=delete_source"; echo "same_name_different_checksum_action=move_to_duplicates"; echo "checksum_unavailable_action=move_to_duplicates"; }
 
-custom_prefixes_status() { normalize_config; echo "== Sortify Dispatch Custom Park Prefixes =="; echo "custom_park_prefixes=$(custom_prefixes_csv)"; echo "guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "custom_prefix_scope=local_hold_only"; echo "dispatcher_marker_required=no"; echo "sdd_targets_managed=no"; }
+custom_prefixes_status() { normalize_config; echo "== Sortify Dispatch Custom Park Prefixes =="; echo "custom_park_prefixes=$(custom_prefixes_csv)"; echo "protected_retention_days=$SORTIFY_PROTECTED_RETENTION_DAYS"; echo "guard_max_files=$SORTIFY_GUARD_MAX_FILES"; echo "guard_status_timeout=$SORTIFY_GUARD_STATUS_TIMEOUT"; echo "custom_prefix_scope=local_hold_only"; echo "dispatcher_marker_required=no"; echo "sdd_targets_managed=no"; }
 
 test_filename_status() {
     normalize_config; name="$(basename "${1:-}")"; [ -n "$name" ] || { echo "test_filename=missing"; return 2; }

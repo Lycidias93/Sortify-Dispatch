@@ -1,3 +1,12 @@
+<!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_CHANGELOG_START -->
+## 4.8.6-protected-retention - Local protected-artifact retention
+
+- Added configurable `protected_retention_days` with a 30-day default and `0` for indefinite local holds.
+- Age-based release applies only to local/custom-prefix/markdown-handover holds and uses file mtime.
+- `target-*` and `targets-*` remain strictly dispatcher-marker gated regardless of age.
+- Added focused retention fixtures and persistent-config migration coverage.
+<!-- SORTIFY_DISPATCH_V486_PROTECTED_RETENTION_CHANGELOG_END -->
+
 <!-- SORTIFY_DISPATCH_V484_WEBUI_ACTION_LAUNCH_HOTFIX_CHANGELOG_START -->
 ## 4.8.4-webui-action-launch-hotfix - WebUI Action Launch Hotfix
 

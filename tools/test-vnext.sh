@@ -17,6 +17,7 @@ required=(
   module/uninstall.sh
   module/config/sortify.conf.default
   tools/package-vnext.py
+  tools/test-protected-retention.sh
 )
 for path in "${required[@]}"; do
   [[ -s "$ROOT/$path" ]] || { echo "missing=$path"; exit 1; }
@@ -59,6 +60,7 @@ echo 'domain_runtime_version_binding=PASS'
 
 grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_PREVIEW_MAX_FILES=50' "$ROOT/module/config/sortify.conf.default"
+grep -Fq 'SORTIFY_PROTECTED_RETENTION_DAYS=30' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/bin/module-control-base"
 grep -Fq 'sh "$CONTROL_BASE" config-get' "$ROOT/module/customize.sh"
 grep -Fq 'set_perm "$MODPATH/bin/webui-server-arm64" 0 0 0755' "$ROOT/module/customize.sh"
@@ -87,9 +89,11 @@ caps=json.load(open(sys.argv[1])); v04=json.load(open(sys.argv[2])); cfg=json.lo
 assert caps['schema']=='root-module-webui.capabilities.v1'
 assert caps['module']['id']=='sortify'
 assert any(x['key']=='preview_max_files' for x in caps['config_fields'])
+assert any(x['key']=='protected_retention_days' for x in caps['config_fields'])
 assert v04['schema']=='root-module-webui.extensions.v2'
 assert any(x['name']=='cleanup-review-apply' for x in v04['jobs'])
 assert cfg['preview_max_files']==50
+assert cfg['protected_retention_days']==30
 assert status['safety']['sdd_policy_v4115'] is True
 PY
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
@@ -117,16 +121,18 @@ grep -Fxq 'INTERVAL=600' "$TMP/legacy-migration-state/sortify.conf"
 grep -Fxq 'SORTIFY_SORT_MODE=manual' "$TMP/legacy-migration-state/sortify.conf"
 grep -Fxq 'SORTIFY_CUSTOM_PARK_PREFIXES=heimnetz__' "$TMP/legacy-migration-state/sortify.conf"
 grep -Fxq 'SORTIFY_PREVIEW_MAX_FILES=50' "$TMP/legacy-migration-state/sortify.conf"
+grep -Fxq 'SORTIFY_PROTECTED_RETENTION_DAYS=30' "$TMP/legacy-migration-state/sortify.conf"
 grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$TMP/legacy-migration-state/sortify.conf"
 cmp -s "$TMP/legacy-migration-state/sortify.conf" "$TMP/legacy-migration-mirror/sortify.conf"
 ls "$TMP/legacy-migration-state/backups"/sortify.conf.pre-normalize.* >/dev/null
 
 cat > "$TMP/runtime/requests/apply.json" <<'JSON'
-{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
+{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply.json" > "$TMP/applied.json"
 python3 -m json.tool "$TMP/applied.json" >/dev/null
 grep -Fxq 'SORTIFY_SORT_MODE=manual' "$TMP/state/sortify.conf"
+grep -Fxq 'SORTIFY_PROTECTED_RETENTION_DAYS=30' "$TMP/state/sortify.conf"
 grep -Fxq 'SORTIFY_PREVIEW_MAX_FILES=75' "$TMP/state/sortify.conf"
 grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$TMP/state/sortify.conf"
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
@@ -135,7 +141,7 @@ ls "$TMP/state/backups"/sortify.conf.* >/dev/null
 # Exercise false as well as true so extraction remains separate from boolean
 # validation and writes the expected 0/1 persistent representation.
 cat > "$TMP/runtime/requests/apply-false.json" <<'JSON'
-{"interval":600,"guard_log":false,"normal_sort":false,"sort_mode":"manual","hold_protected":false,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":false,"preview_max_files":75}
+{"interval":600,"guard_log":false,"normal_sort":false,"sort_mode":"manual","hold_protected":false,"protected_retention_days":30,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":false,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply-false.json" > "$TMP/applied-false.json"
 python3 -m json.tool "$TMP/applied-false.json" >/dev/null
@@ -155,7 +161,7 @@ python3 -m json.tool "$TMP/stale-lock-applied.json" >/dev/null
 [[ ! -d "$TMP/runtime/config-apply.guard" ]]
 
 cat > "$TMP/runtime/requests/reject.json" <<'JSON'
-{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"target-pi3__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
+{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"target-pi3__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/reject.json" >/dev/null 2>&1; then
   echo 'reserved_prefix_reject=FAIL'
@@ -171,12 +177,13 @@ echo 'legacy_config_normalization=PASS'
 echo 'stale_config_lock_recovery=PASS'
 echo 'installer_webui_server_mode=PASS'
 echo 'reserved_prefix_reject=PASS'
+bash "$ROOT/tools/test-protected-retention.sh"
 
 cat > "$TMP/runtime/requests/action-failure.json" <<'JSON'
 {"dry_run":false}
 JSON
 cat > "$TMP/runtime/requests/apply-required-sdd.json" <<'JSON'
-{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"dispatcher_integration":"on","duplicate_mode":"filename","custom_park_prefixes":"","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
+{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"dispatcher_integration":"on","duplicate_mode":"filename","custom_park_prefixes":"","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply-required-sdd.json" >/dev/null
 if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" action-file sort-now "$TMP/runtime/requests/action-failure.json" >/dev/null 2>&1; then

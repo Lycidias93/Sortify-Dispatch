@@ -79,6 +79,7 @@ write_complete_config_from() {
     printf 'SORTIFY_NORMAL_SORT=%s\n' "$(pick SORTIFY_NORMAL_SORT 1)"
     printf 'SORTIFY_SORT_MODE=%s\n' "$(pick SORTIFY_SORT_MODE interval)"
     printf 'SORTIFY_HOLD_PROTECTED=%s\n' "$(pick SORTIFY_HOLD_PROTECTED 1)"
+    printf 'SORTIFY_PROTECTED_RETENTION_DAYS=%s\n' "$(pick SORTIFY_PROTECTED_RETENTION_DAYS 30)"
     printf 'SORTIFY_DISPATCHER_INTEGRATION=%s\n' "$(pick SORTIFY_DISPATCHER_INTEGRATION auto)"
     printf 'SORTIFY_CUSTOM_PARK_PREFIXES=%s\n' "$(source_value SORTIFY_CUSTOM_PARK_PREFIXES)"
     printf 'SORTIFY_GUARD_MAX_FILES=%s\n' "$(pick SORTIFY_GUARD_MAX_FILES 300)"
@@ -155,7 +156,7 @@ config_json() {
   [ "$temp_clean" = 1 ] && temp_clean=true || temp_clean=false
   printf '{"interval":%s,"guard_log":%s,"normal_sort":%s,"sort_mode":' "$(uint_value INTERVAL 300 30 86400)" "$guard_log" "$normal_sort"
   json_string "$(enum_value SORTIFY_SORT_MODE interval 'interval manual boot_once')"
-  printf ',"hold_protected":%s,"dispatcher_integration":' "$hold"; json_string "$(enum_value SORTIFY_DISPATCHER_INTEGRATION auto 'off auto on')"
+  printf ',"hold_protected":%s,"protected_retention_days":%s,"dispatcher_integration":' "$hold" "$(uint_value SORTIFY_PROTECTED_RETENTION_DAYS 30 0 3650)"; json_string "$(enum_value SORTIFY_DISPATCHER_INTEGRATION auto 'off auto on')"
   printf ',"duplicate_mode":'; json_string "$(enum_value SORTIFY_DUPLICATE_MODE filename 'filename checksum_delete_identical')"
   printf ',"custom_park_prefixes":'; json_string "$(prefixes_value)"
   printf ',"guard_max_files":%s,"guard_timeout":%s,"log_max_kb":%s,"guard_temp_clean":%s,"preview_max_files":%s}' \
@@ -173,6 +174,7 @@ print_capabilities() {
   printf '{"key":"normal_sort","label":"Normal sorting","description":"Allow normal Download sorting.","type":"boolean","required":true},'
   printf '{"key":"sort_mode","label":"Automatic sort mode","description":"Choose interval, manual or once per boot.","type":"enum","required":true,"options":[{"value":"interval","label":"Interval"},{"value":"manual","label":"Manual"},{"value":"boot_once","label":"Once per boot"}]},'
   printf '{"key":"hold_protected","label":"Hold protected artifacts","description":"Keep operational artifacts in Download until their safety contract allows release.","type":"boolean","required":true},'
+  printf '{"key":"protected_retention_days","label":"Local protected retention","description":"Auto-release local/custom/handover holds after this many days based on file mtime. 0 keeps them indefinitely. target-/targets- remain marker-gated.","type":"integer","required":true,"min":0,"max":3650},'
   printf '{"key":"dispatcher_integration","label":"Dispatcher integration","description":"off ignores SDD markers, auto uses a healthy SDD link, on requires it.","type":"enum","required":true,"options":[{"value":"off","label":"Off"},{"value":"auto","label":"Auto"},{"value":"on","label":"Required"}]},'
   printf '{"key":"duplicate_mode","label":"Duplicate handling","description":"Checksum mode deletes only byte-identical sources after SHA-256 match.","type":"enum","required":true,"options":[{"value":"filename","label":"Filename only"},{"value":"checksum_delete_identical","label":"Checksum identical"}]},'
   printf '{"key":"custom_park_prefixes","label":"Custom park prefixes","description":"Comma-separated local-hold prefixes. target- and targets- are reserved for SDD.","type":"string","required":false,"max_length":4096,"pattern":"^[A-Za-z0-9_.-]*(,[A-Za-z0-9_.-]+)*$"},'
@@ -207,13 +209,14 @@ print_v04_capabilities() {
 apply_config() {
   file=$1; request_file_allowed "$file" || return 2
   interval=$(json_uint interval "$file"); guard_log=$(json_bool guard_log "$file"); normal_sort=$(json_bool normal_sort "$file"); sort_mode=$(json_text sort_mode "$file")
-  hold=$(json_bool hold_protected "$file"); dispatcher=$(json_text dispatcher_integration "$file"); duplicate=$(json_text duplicate_mode "$file"); prefixes=$(json_text custom_park_prefixes "$file")
+  hold=$(json_bool hold_protected "$file"); retention=$(json_uint protected_retention_days "$file"); dispatcher=$(json_text dispatcher_integration "$file"); duplicate=$(json_text duplicate_mode "$file"); prefixes=$(json_text custom_park_prefixes "$file")
   guard_max=$(json_uint guard_max_files "$file"); guard_timeout=$(json_uint guard_timeout "$file"); log_max=$(json_uint log_max_kb "$file"); temp_clean=$(json_bool guard_temp_clean "$file"); preview_max=$(json_uint preview_max_files "$file")
   case "$interval" in ""|*[!0-9]*) return 2 ;; esac; [ "$interval" -ge 30 ] && [ "$interval" -le 86400 ] || return 2
   case "$guard_log" in true) guard_log=1 ;; false) guard_log=0 ;; *) return 2 ;; esac
   case "$normal_sort" in true) normal_sort=1 ;; false) normal_sort=0 ;; *) return 2 ;; esac
   case "$sort_mode" in interval|manual|boot_once) ;; *) return 2 ;; esac
   case "$hold" in true) hold=1 ;; false) hold=0 ;; *) return 2 ;; esac
+  case "$retention" in ""|*[!0-9]*) return 2 ;; esac; [ "$retention" -le 3650 ] || return 2
   case "$dispatcher" in off|auto|on) ;; *) return 2 ;; esac
   case "$duplicate" in filename|checksum_delete_identical) ;; *) return 2 ;; esac
   prefixes_valid "$prefixes" || return 2
@@ -234,6 +237,7 @@ apply_config() {
     printf 'SORTIFY_NORMAL_SORT=%s\n' "$normal_sort"
     printf 'SORTIFY_SORT_MODE=%s\n' "$sort_mode"
     printf 'SORTIFY_HOLD_PROTECTED=%s\n' "$hold"
+    printf 'SORTIFY_PROTECTED_RETENTION_DAYS=%s\n' "$retention"
     printf 'SORTIFY_DISPATCHER_INTEGRATION=%s\n' "$dispatcher"
     printf 'SORTIFY_CUSTOM_PARK_PREFIXES=%s\n' "$prefixes"
     printf 'SORTIFY_GUARD_MAX_FILES=%s\n' "$guard_max"
