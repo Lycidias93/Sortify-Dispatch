@@ -80,6 +80,9 @@ write_complete_config_from() {
     printf 'SORTIFY_SORT_MODE=%s\n' "$(pick SORTIFY_SORT_MODE interval)"
     printf 'SORTIFY_HOLD_PROTECTED=%s\n' "$(pick SORTIFY_HOLD_PROTECTED 1)"
     printf 'SORTIFY_PROTECTED_RETENTION_DAYS=%s\n' "$(pick SORTIFY_PROTECTED_RETENTION_DAYS 30)"
+    printf 'SORTIFY_REMOTE_PROTECTED_RELEASE_MODE=%s\n' "$(pick SORTIFY_REMOTE_PROTECTED_RELEASE_MODE marker_only)"
+    printf 'SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS=%s\n' "$(pick SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS 14)"
+    printf 'SORTIFY_NTFY_MODE=%s\n' "$(pick SORTIFY_NTFY_MODE all)"
     printf 'SORTIFY_DISPATCHER_INTEGRATION=%s\n' "$(pick SORTIFY_DISPATCHER_INTEGRATION auto)"
     printf 'SORTIFY_CUSTOM_PARK_PREFIXES=%s\n' "$(source_value SORTIFY_CUSTOM_PARK_PREFIXES)"
     printf 'SORTIFY_GUARD_MAX_FILES=%s\n' "$(pick SORTIFY_GUARD_MAX_FILES 300)"
@@ -156,7 +159,9 @@ config_json() {
   [ "$temp_clean" = 1 ] && temp_clean=true || temp_clean=false
   printf '{"interval":%s,"guard_log":%s,"normal_sort":%s,"sort_mode":' "$(uint_value INTERVAL 300 30 86400)" "$guard_log" "$normal_sort"
   json_string "$(enum_value SORTIFY_SORT_MODE interval 'interval manual boot_once')"
-  printf ',"hold_protected":%s,"protected_retention_days":%s,"dispatcher_integration":' "$hold" "$(uint_value SORTIFY_PROTECTED_RETENTION_DAYS 30 0 3650)"; json_string "$(enum_value SORTIFY_DISPATCHER_INTEGRATION auto 'off auto on')"
+  printf ',"hold_protected":%s,"protected_retention_days":%s,"remote_protected_release_mode":' "$hold" "$(uint_value SORTIFY_PROTECTED_RETENTION_DAYS 30 0 3650)"; json_string "$(enum_value SORTIFY_REMOTE_PROTECTED_RELEASE_MODE marker_only 'marker_only marker_or_age')"
+  printf ',"remote_protected_retention_days":%s,"ntfy_mode":' "$(uint_value SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS 14 0 3650)"; json_string "$(enum_value SORTIFY_NTFY_MODE all 'off fail success_fail all')"
+  printf ',"dispatcher_integration":'; json_string "$(enum_value SORTIFY_DISPATCHER_INTEGRATION auto 'off auto on')"
   printf ',"duplicate_mode":'; json_string "$(enum_value SORTIFY_DUPLICATE_MODE filename 'filename checksum_delete_identical')"
   printf ',"custom_park_prefixes":'; json_string "$(prefixes_value)"
   printf ',"guard_max_files":%s,"guard_timeout":%s,"log_max_kb":%s,"guard_temp_clean":%s,"preview_max_files":%s}' \
@@ -168,13 +173,17 @@ config_json() {
 
 print_capabilities() {
   printf '{"schema":"root-module-webui.capabilities.v1","module":{"id":"sortify","name":'; json_string "${MODULE_NAME:-Sortify Dispatch}"; printf ',"version":'; json_string "${MODULE_VERSION:-unknown}"; printf '},'
-  printf '"features":{"config":true,"logs":true,"actions":true,"jobs":true,"inventory":true},"config_fields":['
+  printf '"features":{"config":true,"logs":true,"actions":true,"jobs":true,"inventory":true,"notifications":true},'
+  printf '"notifications":{"provider":"ntfy","label":"ntfy","supports_test":true,"lifecycle":["start","success","fail"]},"config_fields":['
   printf '{"key":"interval","label":"Sort interval","description":"Automatic interval in seconds. Used only in interval mode.","type":"integer","required":true,"min":30,"max":86400},'
   printf '{"key":"guard_log","label":"Guard logging","description":"Write bounded guard events.","type":"boolean","required":true},'
   printf '{"key":"normal_sort","label":"Normal sorting","description":"Allow normal Download sorting.","type":"boolean","required":true},'
   printf '{"key":"sort_mode","label":"Automatic sort mode","description":"Choose interval, manual or once per boot.","type":"enum","required":true,"options":[{"value":"interval","label":"Interval"},{"value":"manual","label":"Manual"},{"value":"boot_once","label":"Once per boot"}]},'
   printf '{"key":"hold_protected","label":"Hold protected artifacts","description":"Keep operational artifacts in Download until their safety contract allows release.","type":"boolean","required":true},'
-  printf '{"key":"protected_retention_days","label":"Local protected retention","description":"Auto-release local/custom/handover holds after this many days based on file mtime. 0 keeps them indefinitely. target-/targets- remain marker-gated.","type":"integer","required":true,"min":0,"max":3650},'
+  printf '{"key":"protected_retention_days","label":"Local protected retention","description":"Auto-release local/custom/handover holds after this many days based on file mtime. 0 keeps them indefinitely.","type":"integer","required":true,"min":0,"max":3650},'
+  printf '{"key":"remote_protected_release_mode","label":"Remote protected release","description":"marker_only keeps target-/targets- strictly SDD marker gated. marker_or_age additionally releases them after the separate remote TTL.","type":"enum","required":true,"options":[{"value":"marker_only","label":"Marker only"},{"value":"marker_or_age","label":"Marker or age"}]},'
+  printf '{"key":"remote_protected_retention_days","label":"Remote protected retention","description":"Age fallback in days for target-/targets- when Remote protected release is marker_or_age. 0 disables age fallback. Uses file mtime.","type":"integer","required":true,"min":0,"max":3650},'
+  printf '{"key":"ntfy_mode","label":"ntfy lifecycle","description":"Reuse the secret-safe SDD ntfy configuration for Sortify start/success/fail lifecycle notifications. Delivery failures never fail sorting.","type":"enum","required":true,"options":[{"value":"off","label":"Off"},{"value":"fail","label":"Failures only"},{"value":"success_fail","label":"Success + fail"},{"value":"all","label":"Start + success + fail"}]},'
   printf '{"key":"dispatcher_integration","label":"Dispatcher integration","description":"off ignores SDD markers, auto uses a healthy SDD link, on requires it.","type":"enum","required":true,"options":[{"value":"off","label":"Off"},{"value":"auto","label":"Auto"},{"value":"on","label":"Required"}]},'
   printf '{"key":"duplicate_mode","label":"Duplicate handling","description":"Checksum mode deletes only byte-identical sources after SHA-256 match.","type":"enum","required":true,"options":[{"value":"filename","label":"Filename only"},{"value":"checksum_delete_identical","label":"Checksum identical"}]},'
   printf '{"key":"custom_park_prefixes","label":"Custom park prefixes","description":"Comma-separated local-hold prefixes. target- and targets- are reserved for SDD.","type":"string","required":false,"max_length":4096,"pattern":"^[A-Za-z0-9_.-]*(,[A-Za-z0-9_.-]+)*$"},'
@@ -209,7 +218,7 @@ print_v04_capabilities() {
 apply_config() {
   file=$1; request_file_allowed "$file" || return 2
   interval=$(json_uint interval "$file"); guard_log=$(json_bool guard_log "$file"); normal_sort=$(json_bool normal_sort "$file"); sort_mode=$(json_text sort_mode "$file")
-  hold=$(json_bool hold_protected "$file"); retention=$(json_uint protected_retention_days "$file"); dispatcher=$(json_text dispatcher_integration "$file"); duplicate=$(json_text duplicate_mode "$file"); prefixes=$(json_text custom_park_prefixes "$file")
+  hold=$(json_bool hold_protected "$file"); retention=$(json_uint protected_retention_days "$file"); remote_mode=$(json_text remote_protected_release_mode "$file"); remote_retention=$(json_uint remote_protected_retention_days "$file"); ntfy_mode=$(json_text ntfy_mode "$file"); dispatcher=$(json_text dispatcher_integration "$file"); duplicate=$(json_text duplicate_mode "$file"); prefixes=$(json_text custom_park_prefixes "$file")
   guard_max=$(json_uint guard_max_files "$file"); guard_timeout=$(json_uint guard_timeout "$file"); log_max=$(json_uint log_max_kb "$file"); temp_clean=$(json_bool guard_temp_clean "$file"); preview_max=$(json_uint preview_max_files "$file")
   case "$interval" in ""|*[!0-9]*) return 2 ;; esac; [ "$interval" -ge 30 ] && [ "$interval" -le 86400 ] || return 2
   case "$guard_log" in true) guard_log=1 ;; false) guard_log=0 ;; *) return 2 ;; esac
@@ -217,6 +226,9 @@ apply_config() {
   case "$sort_mode" in interval|manual|boot_once) ;; *) return 2 ;; esac
   case "$hold" in true) hold=1 ;; false) hold=0 ;; *) return 2 ;; esac
   case "$retention" in ""|*[!0-9]*) return 2 ;; esac; [ "$retention" -le 3650 ] || return 2
+  case "$remote_mode" in marker_only|marker_or_age) ;; *) return 2 ;; esac
+  case "$remote_retention" in ""|*[!0-9]*) return 2 ;; esac; [ "$remote_retention" -le 3650 ] || return 2
+  case "$ntfy_mode" in off|fail|success_fail|all) ;; *) return 2 ;; esac
   case "$dispatcher" in off|auto|on) ;; *) return 2 ;; esac
   case "$duplicate" in filename|checksum_delete_identical) ;; *) return 2 ;; esac
   prefixes_valid "$prefixes" || return 2
@@ -238,6 +250,9 @@ apply_config() {
     printf 'SORTIFY_SORT_MODE=%s\n' "$sort_mode"
     printf 'SORTIFY_HOLD_PROTECTED=%s\n' "$hold"
     printf 'SORTIFY_PROTECTED_RETENTION_DAYS=%s\n' "$retention"
+    printf 'SORTIFY_REMOTE_PROTECTED_RELEASE_MODE=%s\n' "$remote_mode"
+    printf 'SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS=%s\n' "$remote_retention"
+    printf 'SORTIFY_NTFY_MODE=%s\n' "$ntfy_mode"
     printf 'SORTIFY_DISPATCHER_INTEGRATION=%s\n' "$dispatcher"
     printf 'SORTIFY_CUSTOM_PARK_PREFIXES=%s\n' "$prefixes"
     printf 'SORTIFY_GUARD_MAX_FILES=%s\n' "$guard_max"
@@ -313,6 +328,37 @@ run_typed_job() {
   esac
 }
 
+
+load_sortify_ntfy() {
+  NTFY_ENABLED=0; NTFY_URL=""; NTFY_TOPIC=""; NTFY_TOKEN_FILE=""; NTFY_PRIORITY=default; NTFY_TAGS=package
+  NTFY_LIB="$MODDIR/lib/ntfy.sh"
+  [ -r "$NTFY_LIB" ] || return 1
+  . "$NTFY_LIB"
+  cfg="${SORTIFY_NTFY_FALLBACK_CONFIG:-/data/adb/ssh-drop-dispatcher/config.env}"
+  if [ -r "$cfg" ] && webui_ntfy_load_config_file "$cfg"; then SORTIFY_NTFY_SOURCE=sdd; else SORTIFY_NTFY_SOURCE=none; fi
+  return 0
+}
+
+print_notifications_status() {
+  mode=$(enum_value SORTIFY_NTFY_MODE all 'off fail success_fail all')
+  if load_sortify_ntfy; then
+    webui_ntfy_status_json "$SORTIFY_NTFY_SOURCE" "$mode" 'start,success,fail'
+  else
+    printf '%s\n' '{"schema":"root-module-webui.notifications.status.v1","ok":true,"provider":"ntfy","enabled":false,"source":"none","mode":"off","endpoint_configured":false,"topic_configured":false,"token_file_configured":false,"lifecycle":["start","success","fail"]}'
+  fi
+}
+
+run_notifications_test() {
+  reason=helper_missing; sent=false
+  if load_sortify_ntfy; then
+    out=$(webui_ntfy_send TEST '🔵 Sortify TEST' 'Sortify ntfy integration test' 'test_tube,package' default 2>/dev/null || true)
+    reason=$(printf '%s\n' "$out" | sed -n 's/^ntfy_send_state=//p' | head -n 1)
+    [ "$reason" = sent ] && sent=true
+    case "$reason" in sent|failed|disabled|missing_endpoint|curl_missing) ;; *) reason=unavailable ;; esac
+  fi
+  printf '{"schema":"root-module-webui.notifications.test.v1","ok":true,"provider":"ntfy","sent":%s,"reason":"%s"}\n' "$sent" "$reason"
+}
+
 kv_from_output() { printf '%s\n' "$1" | sed -n "s/^$2=//p" | head -n 1; }
 
 print_status() {
@@ -359,5 +405,7 @@ case "${1:-}" in
   job-run) [ "$#" -eq 2 ] || exit 2; run_job "$2" ;;
   job-run-file) [ "$#" -eq 3 ] || exit 2; run_typed_job "$2" "$3" ;;
   inventory) [ "$#" -eq 2 ] || exit 2; print_inventory "$2" ;;
+  notifications-status) [ "$#" -eq 1 ] || exit 2; print_notifications_status ;;
+  notifications-test) [ "$#" -eq 1 ] || exit 2; run_notifications_test ;;
   *) echo '{"ok":false,"error":"unsupported operation"}' >&2; exit 2 ;;
 esac

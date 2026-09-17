@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CORE="$ROOT/.webui-core"
-CORE_COMMIT=0d5c724711733b6f794790ef96d718e96c64c258
-CORE_VERSION=0.6.6
+CORE_COMMIT=53fcb3f25b08d6cdfe056ac2c9500fd0755436bd
+CORE_VERSION=0.7.0
 MODE=${1:-all}
 
 required=(
@@ -18,6 +18,7 @@ required=(
   module/config/sortify.conf.default
   tools/package-vnext.py
   tools/test-protected-retention.sh
+  tools/test-notifications-remote-retention.sh
 )
 for path in "${required[@]}"; do
   [[ -s "$ROOT/$path" ]] || { echo "missing=$path"; exit 1; }
@@ -61,6 +62,9 @@ echo 'domain_runtime_version_binding=PASS'
 grep -Fxq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_PREVIEW_MAX_FILES=50' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_PROTECTED_RETENTION_DAYS=30' "$ROOT/module/config/sortify.conf.default"
+grep -Fq 'SORTIFY_REMOTE_PROTECTED_RELEASE_MODE=marker_only' "$ROOT/module/config/sortify.conf.default"
+grep -Fq 'SORTIFY_REMOTE_PROTECTED_RETENTION_DAYS=14' "$ROOT/module/config/sortify.conf.default"
+grep -Fq 'SORTIFY_NTFY_MODE=all' "$ROOT/module/config/sortify.conf.default"
 grep -Fq 'SORTIFY_DISPATCHER_REQUIRED_POLICY=v4115' "$ROOT/module/bin/module-control-base"
 grep -Fq 'sh "$CONTROL_BASE" config-get' "$ROOT/module/customize.sh"
 grep -Fq 'set_perm "$MODPATH/bin/webui-server-arm64" 0 0 0755' "$ROOT/module/customize.sh"
@@ -90,10 +94,18 @@ assert caps['schema']=='root-module-webui.capabilities.v1'
 assert caps['module']['id']=='sortify'
 assert any(x['key']=='preview_max_files' for x in caps['config_fields'])
 assert any(x['key']=='protected_retention_days' for x in caps['config_fields'])
+assert caps['features']['notifications'] is True
+assert caps['notifications']['provider']=='ntfy'
+assert any(x['key']=='remote_protected_release_mode' for x in caps['config_fields'])
+assert any(x['key']=='remote_protected_retention_days' for x in caps['config_fields'])
+assert any(x['key']=='ntfy_mode' for x in caps['config_fields'])
 assert v04['schema']=='root-module-webui.extensions.v2'
 assert any(x['name']=='cleanup-review-apply' for x in v04['jobs'])
 assert cfg['preview_max_files']==50
 assert cfg['protected_retention_days']==30
+assert cfg['remote_protected_release_mode']=='marker_only'
+assert cfg['remote_protected_retention_days']==14
+assert cfg['ntfy_mode']=='all'
 assert status['safety']['sdd_policy_v4115'] is True
 PY
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
@@ -127,7 +139,7 @@ cmp -s "$TMP/legacy-migration-state/sortify.conf" "$TMP/legacy-migration-mirror/
 ls "$TMP/legacy-migration-state/backups"/sortify.conf.pre-normalize.* >/dev/null
 
 cat > "$TMP/runtime/requests/apply.json" <<'JSON'
-{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
+{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"remote_protected_release_mode":"marker_only","remote_protected_retention_days":14,"ntfy_mode":"all","dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply.json" > "$TMP/applied.json"
 python3 -m json.tool "$TMP/applied.json" >/dev/null
@@ -141,7 +153,7 @@ ls "$TMP/state/backups"/sortify.conf.* >/dev/null
 # Exercise false as well as true so extraction remains separate from boolean
 # validation and writes the expected 0/1 persistent representation.
 cat > "$TMP/runtime/requests/apply-false.json" <<'JSON'
-{"interval":600,"guard_log":false,"normal_sort":false,"sort_mode":"manual","hold_protected":false,"protected_retention_days":30,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":false,"preview_max_files":75}
+{"interval":600,"guard_log":false,"normal_sort":false,"sort_mode":"manual","hold_protected":false,"protected_retention_days":30,"remote_protected_release_mode":"marker_only","remote_protected_retention_days":14,"ntfy_mode":"all","dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"mypark__,heimnetz__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":false,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply-false.json" > "$TMP/applied-false.json"
 python3 -m json.tool "$TMP/applied-false.json" >/dev/null
@@ -161,7 +173,7 @@ python3 -m json.tool "$TMP/stale-lock-applied.json" >/dev/null
 [[ ! -d "$TMP/runtime/config-apply.guard" ]]
 
 cat > "$TMP/runtime/requests/reject.json" <<'JSON'
-{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"target-pi3__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
+{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"remote_protected_release_mode":"marker_only","remote_protected_retention_days":14,"ntfy_mode":"all","dispatcher_integration":"auto","duplicate_mode":"filename","custom_park_prefixes":"target-pi3__","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/reject.json" >/dev/null 2>&1; then
   echo 'reserved_prefix_reject=FAIL'
@@ -177,6 +189,7 @@ echo 'legacy_config_normalization=PASS'
 echo 'stale_config_lock_recovery=PASS'
 echo 'installer_webui_server_mode=PASS'
 echo 'reserved_prefix_reject=PASS'
+bash "$ROOT/tools/test-notifications-remote-retention.sh"
 bash "$ROOT/tools/test-protected-retention.sh"
 bash "$ROOT/tools/test-sort-single-pass-performance.sh"
 
@@ -184,7 +197,7 @@ cat > "$TMP/runtime/requests/action-failure.json" <<'JSON'
 {"dry_run":false}
 JSON
 cat > "$TMP/runtime/requests/apply-required-sdd.json" <<'JSON'
-{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"dispatcher_integration":"on","duplicate_mode":"filename","custom_park_prefixes":"","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
+{"interval":600,"guard_log":true,"normal_sort":true,"sort_mode":"manual","hold_protected":true,"protected_retention_days":30,"remote_protected_release_mode":"marker_only","remote_protected_retention_days":14,"ntfy_mode":"all","dispatcher_integration":"on","duplicate_mode":"filename","custom_park_prefixes":"","guard_max_files":450,"guard_timeout":10,"log_max_kb":2048,"guard_temp_clean":true,"preview_max_files":75}
 JSON
 env "${ENV[@]}" sh "$ROOT/module/bin/module-control" config-apply "$TMP/runtime/requests/apply-required-sdd.json" >/dev/null
 if env "${ENV[@]}" sh "$ROOT/module/bin/module-control" action-file sort-now "$TMP/runtime/requests/action-failure.json" >/dev/null 2>&1; then

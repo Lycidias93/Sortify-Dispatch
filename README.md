@@ -1,10 +1,14 @@
-<!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_README_START -->
-## vNext: Sortify Dispatch 4.8.8
+Candidate 4.8.9 adds standardized ntfy lifecycle notifications through shared WebUI Core 0.7.0 and an explicit optional remote protected age fallback. `marker_only` remains the safe default; `marker_or_age` can be selected separately with its own retention days. ntfy reuses the private SSH Drop Dispatcher configuration without exposing endpoint/topic/token values in Sortify or the browser.
 
-Candidate hotfix for the Magisk **Action** button: the standalone loopback WebUI server now uses shared WebUI Core 0.6.6, which keeps the server alive after the Action shell exits instead of leaving the browser on `ERR_CONNECTION_REFUSED`. Existing Sortify settings and sorting behavior are unchanged.
+<!-- SORTIFY_DISPATCH_V489_NTFY_RETENTION_README_START -->
+## vNext: Sortify Dispatch 4.8.9
 
-Stable `update.json` remains on 4.8.7 until exact-device Action-button acceptance passes.
-<!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_README_END -->
+Candidate `4.8.9-notifications-retention-options` / `versionCode=36` adopts shared WebUI Core 0.7.0. Sortify now exposes secret-safe ntfy status/test UI and can emit non-fatal start/success/fail lifecycle notifications by reusing the private SSH Drop Dispatcher ntfy configuration.
+
+Remote `target-*` / `targets-*` artifacts remain `marker_only` by default. The new explicit `marker_or_age` option adds a separate mtime-based remote retention fallback; local protected retention stays independent.
+
+Stable `update.json` remains on 4.8.7 until exact-device WebUI, ntfy and retention acceptance passes.
+<!-- SORTIFY_DISPATCH_V489_NTFY_RETENTION_README_END -->
 
 <!-- SORTIFY_DISPATCH_V487_SORT_PERFORMANCE_README_START -->
 ## Sortify Dispatch 4.8.7

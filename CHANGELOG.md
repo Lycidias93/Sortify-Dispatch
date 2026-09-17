@@ -1,3 +1,10 @@
+## 4.8.9-notifications-retention-options
+
+- Adopt shared WebUI Core 0.7.0 standardized ntfy status/test capability.
+- Add non-fatal Sortify lifecycle ntfy events for start, success and failure using the existing private SDD ntfy configuration.
+- Add explicit `marker_only|marker_or_age` remote target release policy with a separate mtime-based retention value; safe default remains `marker_only`.
+- Keep public stable `update.json` unchanged until exact-device WebUI/notification/retention acceptance passes.
+
 <!-- SORTIFY_DISPATCH_V488_WEBUI_ACTION_SIGHUP_CHANGELOG_START -->
 ## 4.8.8-webui-action-sighup-hotfix - Magisk Action WebUI lifetime
 

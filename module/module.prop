@@ -1,8 +1,8 @@
 id=sortify
 name=Sortify Dispatch
-version=4.8.8-webui-action-sighup-hotfix
-versionCode=35
+version=4.8.9-notifications-retention-options
+versionCode=36
 author=xCaptaiN09 + Lycidias93
-description=Sortify Dispatch with SIGHUP-safe Magisk Action WebUI, single-pass sorting, protected retention, persistent config and SDD policy v4115.
+description=Sortify Dispatch with standardized ntfy lifecycle notifications, optional remote protected TTL fallback, single-pass sorting and SDD policy v4115.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json
 banner=banner.png
