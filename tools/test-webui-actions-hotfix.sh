@@ -55,10 +55,12 @@ assert 'guard_status=timeout' in payload.get('message', ''), payload
 PY
 echo 'guard_status_timeout_semantic_transport=PASS'
 
-[[ "$(tr -d '\r\n' < "$ROOT/.webui-core/CORE_VERSION")" == "0.7.0" ]]
+[[ "$(tr -d '\r\n' < "$ROOT/.webui-core/CORE_VERSION")" == "0.7.1" ]]
 grep -Fq 'server_detach=hup_safe' "$ROOT/.webui-core/module/action.sh"
 grep -Fq 'nohup "$@" </dev/null >> "$LOG_FILE" 2>&1 &' "$ROOT/.webui-core/module/action.sh"
 grep -Fq "trap '' HUP" "$ROOT/.webui-core/module/action.sh"
+grep -Fq 'grep -Fq "$SERVER" "/proc/$pid/cmdline" 2>/dev/null' "$ROOT/.webui-core/module/action.sh"
+echo "webui_action_pid_identity_portability=PASS"
 echo 'webui_action_launcher_detach_contract=PASS'
 
 grep -Fq '"apply_job":"sort-now"' "$ROOT/module/bin/module-control-base"
