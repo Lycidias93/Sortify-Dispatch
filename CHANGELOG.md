@@ -1,3 +1,10 @@
+## 4.8.10-webui-action-pid-guard-hotfix
+
+- Pin shared WebUI Core 0.7.1.
+- Fix Android/Magisk Action PID identity checks that could hang in a NUL-translation pipeline.
+- Preserve the 4.8.9 standardized ntfy lifecycle integration and remote-retention options unchanged.
+- Keep stable update.json unchanged pending exact-device acceptance.
+
 ## 4.8.9-notifications-retention-options
 
 - Adopt shared WebUI Core 0.7.0 standardized ntfy status/test capability.

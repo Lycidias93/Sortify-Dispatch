@@ -1,3 +1,15 @@
+Candidate 4.8.10 fixes the Android/Magisk Action PID identity hang through shared WebUI Core 0.7.1. The ntfy/retention feature set from 4.8.9 is unchanged; Stable update.json remains unchanged until exact-device acceptance passes.
+
+<!-- SORTIFY_DISPATCH_V4810_PID_GUARD_README_START -->
+## vNext: Sortify Dispatch 4.8.10
+
+Candidate `4.8.10-webui-action-pid-guard-hotfix` / `versionCode=37` pins shared WebUI Core 0.7.1. The Action launcher now checks `/proc/<pid>/cmdline` directly instead of the Android-hanging NUL-translation pipeline.
+
+Notifications remain standardized through Core 0.7.x, use the existing private SDD ntfy configuration, and keep `start/success/fail` delivery non-fatal. Remote protected release remains `marker_only` by default with opt-in `marker_or_age`.
+
+Stable `update.json` remains unchanged until exact-device Action, Notifications and retention acceptance passes.
+<!-- SORTIFY_DISPATCH_V4810_PID_GUARD_README_END -->
+
 Candidate 4.8.9 adds standardized ntfy lifecycle notifications through shared WebUI Core 0.7.0 and an explicit optional remote protected age fallback. `marker_only` remains the safe default; `marker_or_age` can be selected separately with its own retention days. ntfy reuses the private SSH Drop Dispatcher configuration without exposing endpoint/topic/token values in Sortify or the browser.
 
 <!-- SORTIFY_DISPATCH_V489_NTFY_RETENTION_README_START -->
