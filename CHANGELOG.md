@@ -1,3 +1,8 @@
+## 4.8.11-contract-smoke-default-prefix-hotfix
+
+- Fixed **Contract smoke** reporting a false failure when no custom park prefix is configured.
+- Configured custom park prefixes continue to be verified when present.
+
 ## 4.8.10-webui-action-pid-guard-hotfix
 
 - Fixed Magisk **Action** WebUI startup on Android when PID identity checking could hang or leave the browser with an unreachable loopback server.

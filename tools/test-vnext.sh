@@ -113,6 +113,13 @@ assert status['safety']['sdd_policy_v4115'] is True
 PY
 cmp -s "$TMP/state/sortify.conf" "$TMP/legacy/sortify.conf"
 
+# Default config has no custom park prefix. Contract smoke must treat that
+# intentional default as not-configured instead of fabricating heimnetz__.
+env "${ENV[@]}" sh "$ROOT/module/bin/sortify-domain" --contract-smoke > "$TMP/contract-smoke-default.log"
+grep -Fq 'custom_prefix_configured=SKIP reason=not_configured' "$TMP/contract-smoke-default.log"
+grep -Fq 'RESULT: SORTIFY_DISPATCH_CONTRACT_SMOKE_PASS rc=0' "$TMP/contract-smoke-default.log"
+echo 'contract_smoke_empty_custom_prefix=PASS'
+
 # Representative stable/legacy config: preserve existing values while adding
 # every vNext-owned field during normalization.
 mkdir -p "$TMP/legacy-migration-state" "$TMP/legacy-migration-runtime" "$TMP/legacy-migration-mirror"

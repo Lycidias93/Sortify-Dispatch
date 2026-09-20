@@ -1,5 +1,9 @@
 Current stable: Sortify Dispatch 4.8.10 adds reliable Magisk Action WebUI startup, standardized ntfy lifecycle notifications and an optional remote protected-age fallback while keeping the safe marker-only default.
 
+## vNext: Sortify Dispatch 4.8.11
+
+Candidate `4.8.11-contract-smoke-default-prefix-hotfix` / `versionCode=38` fixes the safe **Contract smoke** action falsely failing when the optional custom park-prefix list is empty. The stable update channel remains on 4.8.10 until exact-device acceptance passes.
+
 <!-- SORTIFY_DISPATCH_V4810_PID_GUARD_README_START -->
 ## Sortify Dispatch 4.8.10
 
