@@ -1,9 +1,10 @@
 ## 4.8.10-webui-action-pid-guard-hotfix
 
-- Pin shared WebUI Core 0.7.1.
-- Fix Android/Magisk Action PID identity checks that could hang in a NUL-translation pipeline.
-- Preserve the 4.8.9 standardized ntfy lifecycle integration and remote-retention options unchanged.
-- Keep stable update.json unchanged pending exact-device acceptance.
+- Fixed Magisk **Action** WebUI startup on Android when PID identity checking could hang or leave the browser with an unreachable loopback server.
+- Kept the standalone WebUI server alive after the root-manager Action shell exits.
+- Added secret-safe ntfy status/test controls and non-fatal Sortify lifecycle notifications for start, success and failure using the existing SSH Drop Dispatcher ntfy configuration.
+- Added optional `marker_or_age` release for remote protected artifacts with an independent mtime-based retention value; the safe default remains `marker_only`.
+- Existing Sortify settings and persistent configuration remain preserved across the update.
 
 ## 4.8.9-notifications-retention-options
 
