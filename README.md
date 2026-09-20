@@ -1,13 +1,15 @@
-Candidate 4.8.10 fixes the Android/Magisk Action PID identity hang through shared WebUI Core 0.7.1. The ntfy/retention feature set from 4.8.9 is unchanged; Stable update.json remains unchanged until exact-device acceptance passes.
+Current stable: Sortify Dispatch 4.8.10 adds reliable Magisk Action WebUI startup, standardized ntfy lifecycle notifications and an optional remote protected-age fallback while keeping the safe marker-only default.
 
 <!-- SORTIFY_DISPATCH_V4810_PID_GUARD_README_START -->
-## vNext: Sortify Dispatch 4.8.10
+## Sortify Dispatch 4.8.10
 
-Candidate `4.8.10-webui-action-pid-guard-hotfix` / `versionCode=37` pins shared WebUI Core 0.7.1. The Action launcher now checks `/proc/<pid>/cmdline` directly instead of the Android-hanging NUL-translation pipeline.
+Current release: `4.8.10-webui-action-pid-guard-hotfix` / `versionCode=37`.
 
-Notifications remain standardized through Core 0.7.x, use the existing private SDD ntfy configuration, and keep `start/success/fail` delivery non-fatal. Remote protected release remains `marker_only` by default with opt-in `marker_or_age`.
+The Magisk **Action** WebUI now survives the root-manager shell ending and avoids the Android PID-identity check that could hang startup. Sortify also exposes secret-safe ntfy status/test controls and emits non-fatal `start/success/fail` lifecycle notifications by reusing the existing SSH Drop Dispatcher ntfy configuration.
 
-Stable `update.json` remains unchanged until exact-device Action, Notifications and retention acceptance passes.
+Remote `target-*` / `targets-*` artifacts remain `marker_only` by default. The optional `marker_or_age` mode adds an independent mtime-based remote retention fallback without changing local protected retention.
+
+Existing Sortify settings and persistent configuration are preserved during the update. Install with a Magisk/KernelSU-compatible module manager and reboot once.
 <!-- SORTIFY_DISPATCH_V4810_PID_GUARD_README_END -->
 
 Candidate 4.8.9 adds standardized ntfy lifecycle notifications through shared WebUI Core 0.7.0 and an explicit optional remote protected age fallback. `marker_only` remains the safe default; `marker_or_age` can be selected separately with its own retention days. ntfy reuses the private SSH Drop Dispatcher configuration without exposing endpoint/topic/token values in Sortify or the browser.
