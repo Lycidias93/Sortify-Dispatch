@@ -1,6 +1,6 @@
 {
-  "version": "4.8.7-sort-performance",
-  "versionCode": 34,
-  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.7-sort-performance/Sortify-Dispatch-4.8.7-sort-performance.zip",
-  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.7-sort-performance.md"
+  "version": "4.8.10-webui-action-pid-guard-hotfix",
+  "versionCode": 37,
+  "zipUrl": "https://github.com/Lycidias93/Sortify-Dispatch/releases/download/v4.8.10-webui-action-pid-guard-hotfix/Sortify-Dispatch-4.8.10-webui-action-pid-guard-hotfix.zip",
+  "changelog": "https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/RELEASE_NOTES_v4.8.10-webui-action-pid-guard-hotfix.md"
 }
