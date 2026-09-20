@@ -1,7 +1,7 @@
 id=sortify
 name=Sortify Dispatch
-version=4.8.10-webui-action-pid-guard-hotfix
-versionCode=37
+version=4.8.11-contract-smoke-default-prefix-hotfix
+versionCode=38
 author=xCaptaiN09 + Lycidias93
 description=Sortify Dispatch with standardized ntfy lifecycle notifications, optional remote protected TTL fallback, single-pass sorting and SDD policy v4115.
 updateJson=https://raw.githubusercontent.com/Lycidias93/Sortify-Dispatch/main/update.json

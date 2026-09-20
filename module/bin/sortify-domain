@@ -796,7 +796,13 @@ sortify_contract_smoke() {
     [ -d "$PIDD_SORTIFY_RELEASE_DIR" ] && echo "marker_root_present=yes" || echo "marker_root_present=no"
     echo "dispatcher_integration_state=$(dispatcher_integration_state)"
     echo "dispatcher_link_readonly=PASS"
-    contract_smoke_check_contains "custom_prefix_heimnetz" "reason=custom_prefix:heimnetz__" test_filename_status "heimnetz__handover.md" || fail=$((fail + 1))
+    custom_prefixes="$(custom_prefixes_csv)"
+    if [ -n "$custom_prefixes" ]; then
+        first_custom_prefix="${custom_prefixes%%,*}"
+        contract_smoke_check_contains "custom_prefix_configured" "reason=custom_prefix:$first_custom_prefix" test_filename_status "${first_custom_prefix}handover.md" || fail=$((fail + 1))
+    else
+        echo "custom_prefix_configured=SKIP reason=not_configured"
+    fi
     contract_smoke_check_contains "markdown_handover_hold" "reason=markdown_handover_hold" test_filename_status "RELEASE_NOTES_${MODULE_VERSION}.md" || fail=$((fail + 1))
     contract_smoke_check_contains "pixel_local_hold_local_hold" "local_hold=yes" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
     contract_smoke_check_contains "pixel_local_hold_no_marker" "dispatcher_marker_required=no" test_filename_status "pixel_local__helper.py" || fail=$((fail + 1))
